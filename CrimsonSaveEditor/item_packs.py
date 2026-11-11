@@ -8,6 +8,8 @@ from urllib.request import urlopen, Request
 from urllib.error import URLError
 from dataclasses import dataclass, field, asdict
 
+import platform_paths
+
 PACKS_REPO = "NattKh/CrimsonDesertCommunityItemMapping"
 PACKS_BRANCH = "main"
 PACKS_DIR = "packs"
@@ -86,12 +88,8 @@ class PackIndexEntry:
 class PackManager:
 
     def __init__(self, local_dir: str = ""):
-        import sys
         if not local_dir:
-            if getattr(sys, 'frozen', False):
-                local_dir = os.path.join(os.path.dirname(os.path.abspath(sys.executable)), "packs")
-            else:
-                local_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "packs")
+            local_dir = str(platform_paths.writable_dir("packs"))
         self.local_dir = local_dir
         os.makedirs(self.local_dir, exist_ok=True)
 

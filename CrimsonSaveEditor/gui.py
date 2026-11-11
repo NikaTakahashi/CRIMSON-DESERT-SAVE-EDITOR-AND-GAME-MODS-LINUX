@@ -2882,10 +2882,8 @@ class MainWindow(QMainWindow):
 
 
     def _get_config_path(self) -> str:
-        import sys
-        if getattr(sys, 'frozen', False):
-            return os.path.join(os.path.dirname(os.path.abspath(sys.executable)), self._CONFIG_FILE)
-        return os.path.join(os.path.dirname(os.path.abspath(__file__)), self._CONFIG_FILE)
+        # Read-only layouts (e.g. an AppImage) fall back to the per-user data dir.
+        return str(platform_paths.writable_dir() / self._CONFIG_FILE)
 
     def _load_config(self) -> dict:
         path = self._get_config_path()

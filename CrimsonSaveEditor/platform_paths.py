@@ -41,6 +41,35 @@ def app_data_dir(app_name: str = APP_NAME) -> Path:
     return base / app_name
 
 
+def run_dir(subdir: str = "") -> Path:
+    """Folder the program itself lives in (bundled data such as icon caches)."""
+    if getattr(sys, "frozen", False):
+        base = Path(os.path.dirname(os.path.abspath(sys.executable)))
+    else:
+        base = Path(os.path.dirname(os.path.abspath(__file__)))
+    return base / subdir if subdir else base
+
+
+def writable_dir(subdir: str = "", app_name: str = APP_NAME) -> Path:
+    """Where runtime data (config, packs, sets) is written.
+
+    Writing next to the executable is the documented behaviour, but read-only
+    layouts -- an AppImage, a system-wide install -- make that folder
+    uncreatable, so fall back to the per-user data directory.
+    """
+    target = run_dir(subdir)
+    try:
+        target.mkdir(parents=True, exist_ok=True)
+        return target
+    except OSError:
+        fallback = app_data_dir(app_name) / subdir
+        try:
+            fallback.mkdir(parents=True, exist_ok=True)
+        except OSError:
+            pass
+        return fallback
+
+
 def open_path(path: str | os.PathLike[str]) -> None:
     """Open a folder/file in the desktop shell, or launch a steam:// URL."""
     target = str(path)

@@ -6,6 +6,8 @@ import time
 from typing import Dict, List, Optional
 from dataclasses import dataclass, field, asdict
 
+import platform_paths
+
 
 @dataclass
 class StatOperation:
@@ -108,12 +110,8 @@ class SetIndexEntry:
 class SetManager:
 
     def __init__(self, local_dir: str = ""):
-        import sys
         if not local_dir:
-            if getattr(sys, 'frozen', False):
-                local_dir = os.path.join(os.path.dirname(os.path.abspath(sys.executable)), "sets")
-            else:
-                local_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "sets")
+            local_dir = str(platform_paths.writable_dir("sets"))
         self.local_dir = local_dir
         os.makedirs(self.local_dir, exist_ok=True)
 

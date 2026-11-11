@@ -4412,6 +4412,8 @@ class DropsetTab(QWidget):
         meipass = getattr(sys, "_MEIPASS", None)
         if meipass:
             dirs.append(os.path.join(meipass, "dropset_packs"))
+        # Read-only layouts (e.g. an AppImage): the per-user data dir is the writable home for packs.
+        dirs.append(str(platform_paths.writable_dir("dropset_packs")))
 
         try:
             os.makedirs(dirs[0], exist_ok=True)

@@ -29,7 +29,7 @@ PROJECTS = {
 }
 
 
-def find_qt_libs() -> tuple[str, str]:
+def find_qt_libs() -> tuple[str | None, str | None]:
     paths = []
     try:
         paths.extend(site.getsitepackages())
@@ -42,11 +42,13 @@ def find_qt_libs() -> tuple[str, str]:
     for base in paths:
         if not base:
             continue
-        pyside = sorted(glob.glob(os.path.join(base, "PySide6", "libpyside6*.so*")))
-        shiboken = sorted(glob.glob(os.path.join(base, "shiboken6", "libshiboken6*.so*")))
+        pyside = sorted(glob.glob(os.path.join(base, "PySide6", "libpyside6*.so*"))
+                        + glob.glob(os.path.join(base, "PySide6", "pyside6*.dll")))
+        shiboken = sorted(glob.glob(os.path.join(base, "shiboken6", "libshiboken6*.so*"))
+                          + glob.glob(os.path.join(base, "shiboken6", "shiboken6*.dll")))
         if pyside and shiboken:
             return pyside[0], shiboken[0]
-    raise SystemExit("Unable to locate PySide6/shiboken6 shared libraries")
+    return None, None
 
 
 def run(cmd: list[str], cwd: Path) -> None:
@@ -66,7 +68,6 @@ def main() -> int:
 
     target = project["targets"][args.target]
     root = project["root"]
-    pyside_lib, shiboken_lib = find_qt_libs()
 
     for cache in root.rglob("__pycache__"):
         shutil.rmtree(cache, ignore_errors=True)
@@ -80,6 +81,10 @@ def main() -> int:
 
     build_dir = root / target["out"]
     shutil.rmtree(build_dir, ignore_errors=True)
+
+    pyside_lib, shiboken_lib = find_qt_libs()
+    if not pyside_lib or not shiboken_lib:
+        raise SystemExit("Unable to locate PySide6/shiboken6 shared libraries")
 
     cmd = [
         sys.executable,
