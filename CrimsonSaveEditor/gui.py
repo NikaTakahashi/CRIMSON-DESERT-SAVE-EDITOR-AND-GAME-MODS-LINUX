@@ -4,11 +4,13 @@ import datetime
 import json
 import logging
 import os
+import platform_paths
 import re
 import shutil
 import struct
 import sys
 import traceback
+from pathlib import Path
 from time import perf_counter
 
 log = logging.getLogger(__name__)
@@ -64,16 +66,7 @@ from theme_support import (
 
 
 def _is_game_running() -> bool:
-    try:
-        import subprocess
-        out = subprocess.check_output(
-            ["tasklist", "/FI", "IMAGENAME eq CrimsonDesert.exe", "/FO", "CSV", "/NH"],
-            stderr=subprocess.DEVNULL, text=True, timeout=3,
-            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
-        )
-        return "CrimsonDesert.exe" in out
-    except Exception:
-        return False
+    return platform_paths.is_process_running("CrimsonDesert.exe")
 
 
 COLORS = dict(DARK_COLORS)
@@ -504,17 +497,10 @@ def find_save_files() -> List[dict]:
         epic_dir = os.path.join(local_app, "Pearl Abyss", "CD_Epic", "save")
         search_dirs.extend([steam_dir, epic_dir])
 
-    if sys.platform != "win32":
-        import pathlib
-        user = os.getenv("USER", "")
-        if user:
-            linux_steam = pathlib.Path(
-                f"/home/{user}/.local/share/Steam/steamapps/compatdata"
-                f"/3321460/pfx/drive_c/users/steamuser/AppData/Local"
-                f"/Pearl Abyss/CD/save"
-            )
-            if linux_steam.is_dir():
-                search_dirs.append(str(linux_steam))
+    # Proton prefixes (and the Windows LOCALAPPDATA roots already listed above).
+    for root in platform_paths.save_root_candidates():
+        if root not in search_dirs:
+            search_dirs.append(root)
 
     for base_dir in search_dirs:
         if not os.path.isdir(base_dir):
@@ -3317,10 +3303,38 @@ class MainWindow(QMainWindow):
             self._ps_collapse_btn.setText("\u25B6")
             self._ps_collapse_btn.setToolTip("Collapse Pack Browser")
 
+    @staticmethod
+    def _default_save_root() -> str:
+        """Folder the auto-detector checks first, used as a dialog default."""
+        candidates = platform_paths.save_root_candidates()
+        if candidates:
+            return candidates[0]
+        if platform_paths.is_windows():
+            return r"%LOCALAPPDATA%\Pearl Abyss\CD\save"
+        return str(Path.home())
+
+    @staticmethod
+    def _default_game_root() -> str:
+        """Existing game install candidate, used as a dialog default."""
+        for candidate in platform_paths.game_install_candidates():
+            if os.path.isdir(candidate):
+                return candidate
+        return str(Path.home())
+
+    @staticmethod
+    def _appdata_example() -> str:
+        """Example path shown next to the custom-AppData setting."""
+        if platform_paths.is_windows():
+            return "e.g. D:\\Users\\YourName\\AppData\\Local"
+        prefixes = platform_paths.steam_compatdata_dir()
+        if prefixes:
+            return "e.g. " + str(Path(prefixes[0]) / "drive_c" / "users" / "steamuser" / "AppData" / "Local")
+        return "e.g. " + str(Path.home() / ".local/share/Steam/steamapps/compatdata" / str(platform_paths.STEAM_APP_ID) / "pfx")
+
     def _browse_save_root(self) -> None:
         path = QFileDialog.getExistingDirectory(
             self, "Select Save Root Folder",
-            self._config.get("save_root", r"C:\Users")
+            self._config.get("save_root") or self._default_save_root()
         )
         if path:
             self._config["save_root"] = path
@@ -3351,17 +3365,6 @@ class MainWindow(QMainWindow):
         if custom_appdata and os.path.isdir(custom_appdata):
             localappdata_paths.insert(0, custom_appdata)
 
-        if sys.platform != "win32":
-            user = os.getenv("USER", "")
-            if user:
-                linux_steam = os.path.join(
-                    f"/home/{user}/.local/share/Steam/steamapps/compatdata",
-                    "3321460/pfx/drive_c/users/steamuser/AppData/Local",
-                    "Pearl Abyss/CD/save",
-                )
-                if os.path.isdir(linux_steam) and linux_steam not in roots:
-                    roots.append(linux_steam)
-
         for local in localappdata_paths:
             if not local:
                 continue
@@ -3384,6 +3387,10 @@ class MainWindow(QMainWindow):
                                             roots.append(("gamepass_wgs", wgs_user, pkg))
                 except OSError:
                     pass
+
+        for root in platform_paths.save_root_candidates():
+            if root not in roots:
+                roots.append(root)
 
         if not roots:
             self._save_root_label.setText("No saves found")
@@ -3561,13 +3568,7 @@ class MainWindow(QMainWindow):
 
     @staticmethod
     def _open_folder(folder: str) -> None:
-        import subprocess
-        if sys.platform == 'win32':
-            os.startfile(folder)
-        elif sys.platform == 'darwin':
-            subprocess.Popen(['open', folder])
-        else:
-            subprocess.Popen(['xdg-open', folder])
+        platform_paths.open_path(folder)
 
     def _open_settings(self) -> None:
         dlg = QDialog(self)
@@ -3579,7 +3580,7 @@ class MainWindow(QMainWindow):
         desc = QLabel(
             "If your game saves are on a different drive (D:, E:, etc.) or a custom location,\n"
             "set the path here. Leave empty for auto-detect.\n\n"
-            "Default: %LOCALAPPDATA%\\Pearl Abyss\\CD\\save"
+            f"Default: {self._default_save_root()}"
         )
         desc.setStyleSheet(f"color: {COLORS['text_dim']}; font-size: 10px;")
         layout.addWidget(desc)
@@ -3587,17 +3588,23 @@ class MainWindow(QMainWindow):
         path_row = QHBoxLayout()
         self._settings_path = QLineEdit()
         self._settings_path.setText(self._config.get("save_root", ""))
-        self._settings_path.setPlaceholderText("e.g. D:\\AppData\\Local\\Pearl Abyss\\CD\\save")
+        if platform_paths.is_windows():
+            self._settings_path.setPlaceholderText("e.g. D:\\AppData\\Local\\Pearl Abyss\\CD\\save")
+        else:
+            self._settings_path.setPlaceholderText(f"e.g. {self._default_save_root()}")
         path_row.addWidget(self._settings_path, 1)
         browse = QPushButton("Browse...")
         browse.clicked.connect(lambda: self._settings_browse_path())
         path_row.addWidget(browse)
         layout.addLayout(path_row)
 
-        layout.addWidget(QLabel("Custom LOCALAPPDATA Path (for non-C: drive installs):"))
+        if platform_paths.is_windows():
+            layout.addWidget(QLabel("Custom LOCALAPPDATA Path (for non-C: drive installs):"))
+        else:
+            layout.addWidget(QLabel("Custom AppData Path (Steam/Proton prefix install):"))
         self._settings_appdata = QLineEdit()
         self._settings_appdata.setText(self._config.get("custom_localappdata", ""))
-        self._settings_appdata.setPlaceholderText("e.g. D:\\Users\\YourName\\AppData\\Local")
+        self._settings_appdata.setPlaceholderText(self._appdata_example())
         layout.addWidget(self._settings_appdata)
 
         self._settings_use_current = QCheckBox("Set currently loaded save folder as default path")
@@ -3642,7 +3649,7 @@ class MainWindow(QMainWindow):
 
         open_lang_btn = QPushButton("Open Locale Folder")
         open_lang_btn.setStyleSheet(f"font-size: 10px; color: {COLORS['text_dim']};")
-        open_lang_btn.clicked.connect(lambda: os.startfile(os.path.join(self._app_dir(), 'locale')))
+        open_lang_btn.clicked.connect(lambda: platform_paths.open_path(os.path.join(self._app_dir(), 'locale')))
         lang_btn_row.addWidget(open_lang_btn)
 
         lang_btn_row.addStretch()
@@ -7175,12 +7182,13 @@ QCheckBox::indicator {{
         return None
 
     def _dye_find_cli(self) -> str | None:
+        exe_name = "dye_cli.exe" if platform_paths.is_windows() else "dye_cli"
         candidates = [
-            os.path.join(os.path.dirname(os.path.abspath(sys.argv[0])), "dye_cli.exe"),
-            os.path.join(os.path.dirname(os.path.abspath(__file__)), "dye_cli.exe"),
+            os.path.join(os.path.dirname(os.path.abspath(sys.argv[0])), exe_name),
+            os.path.join(os.path.dirname(os.path.abspath(__file__)), exe_name),
         ]
         if hasattr(sys, '_MEIPASS'):
-            candidates.insert(0, os.path.join(sys._MEIPASS, "dye_cli.exe"))
+            candidates.insert(0, os.path.join(sys._MEIPASS, exe_name))
         for c in candidates:
             if os.path.isfile(c):
                 return c
@@ -16190,11 +16198,7 @@ QCheckBox::indicator {{
             return
         json_dir = loader.json_dir
         os.makedirs(json_dir, exist_ok=True)
-        if os.name == 'nt':
-            os.startfile(json_dir)
-        else:
-            import subprocess
-            subprocess.Popen(["xdg-open", json_dir])
+        platform_paths.open_path(json_dir)
 
 
     def _asi_get_manager(self):
@@ -16349,11 +16353,7 @@ QCheckBox::indicator {{
         else:
             asi_dir = str(mgr.asi_source)
         os.makedirs(asi_dir, exist_ok=True)
-        if os.name == 'nt':
-            os.startfile(asi_dir)
-        else:
-            import subprocess
-            subprocess.Popen(["xdg-open", asi_dir])
+        platform_paths.open_path(asi_dir)
 
 
     def _build_skills_tab(self) -> None:
@@ -20327,7 +20327,7 @@ QCheckBox::indicator {{
         current = self._config.get("game_install_path", "")
         path = QFileDialog.getExistingDirectory(
             self, "Select Crimson Desert Install Folder",
-            current or "C:\\"
+            current or self._default_game_root()
         )
         if not path:
             return
@@ -20355,7 +20355,7 @@ QCheckBox::indicator {{
         current = self._paz_game_path.text().strip() or self._config.get("game_install_path", "")
         path = QFileDialog.getExistingDirectory(
             self, "Select Crimson Desert Install Folder",
-            current or "C:\\"
+            current or self._default_game_root()
         )
         if path:
             if not self._validate_game_path(path):
@@ -20525,10 +20525,9 @@ QCheckBox::indicator {{
             QMessageBox.warning(self, "No Game Path", "Set the game install path first.")
             return
 
-        if not self._is_admin():
+        if not self._is_admin(game_path):
             QMessageBox.warning(self, "Admin Required",
-                                "Writing to game files requires administrator privileges.\n\n"
-                                "Right-click → Run as administrator")
+                                self._write_permission_message("Writing to game files", game_path))
             return
 
         reply = QMessageBox.question(
@@ -20575,10 +20574,9 @@ QCheckBox::indicator {{
         if not game_path:
             QMessageBox.warning(self, "No Game Path", "Set the game install path first.")
             return
-        if not self._is_admin():
+        if not self._is_admin(game_path):
             QMessageBox.warning(self, "Admin Required",
-                                "Writing to game files requires administrator privileges.\n"
-                                "Right-click → Run as administrator")
+                                self._write_permission_message("Writing to game files", game_path))
             return
 
         reply = QMessageBox.question(
@@ -20627,10 +20625,9 @@ QCheckBox::indicator {{
         if not game_path:
             QMessageBox.warning(self, "No Game Path", "Set the game install path first.")
             return
-        if not self._is_admin():
+        if not self._is_admin(game_path):
             QMessageBox.warning(self, "Admin Required",
-                                "Writing to game files requires administrator privileges.\n"
-                                "Right-click → Run as administrator")
+                                self._write_permission_message("Writing to game files", game_path))
             return
 
         reply = QMessageBox.question(
@@ -25383,12 +25380,30 @@ QCheckBox::indicator {{
         )
 
     @staticmethod
-    def _is_admin() -> bool:
+    def _is_admin(target: str = "") -> bool:
+        """Administrator on Windows; plain write permission on other platforms."""
+        if platform_paths.is_windows():
+            try:
+                import ctypes
+                return ctypes.windll.shell32.IsUserAnAdmin() != 0
+            except Exception:
+                return False
         try:
-            import ctypes
-            return ctypes.windll.shell32.IsUserAnAdmin() != 0
+            return os.access(target or str(Path.home()), os.W_OK)
         except Exception:
             return False
+
+    @staticmethod
+    def _write_permission_message(action: str, target: str,
+                                  windows_hint: str = "Right-click → Run as administrator") -> str:
+        """Warning text; administrator wording is kept for Windows only."""
+        if platform_paths.is_windows():
+            return f"{action} requires administrator privileges.\n\n{windows_hint}"
+        return (
+            f"{action} needs write access to:\n{target}\n\n"
+            "Fix the folder permissions, or run the editor as the account that "
+            "owns the game files."
+        )
 
     def _buff_max_stacks(self, target: int = 9999) -> None:
         game_path = self._pabgb_get_game_path() if hasattr(self, '_pabgb_get_game_path') else self._config.get("game_install_path", "")
@@ -25396,11 +25411,10 @@ QCheckBox::indicator {{
             QMessageBox.warning(self, "No Game Path", "Set the game install path using the Browse button at the top.")
             return
 
-        if not self._is_admin():
+        if not self._is_admin(game_path):
             QMessageBox.warning(
                 self, "Admin Required",
-                "Writing to game files requires administrator privileges.\n\n"
-                "Right-click → Run as administrator",
+                self._write_permission_message("Writing to game files", game_path),
             )
             return
 
@@ -25860,12 +25874,15 @@ QCheckBox::indicator {{
         if not self._buff_ensure_patcher():
             return
 
-        if not self._is_admin():
+        if not self._is_admin(self._buff_patcher.game_path):
             QMessageBox.warning(
                 self, "Admin Required",
-                "Writing to game files in Program Files requires administrator privileges.\n\n"
-                "Please restart the editor as Administrator:\n"
-                "Right-click → Run as administrator",
+                self._write_permission_message(
+                    "Writing to game files",
+                    self._buff_patcher.game_path,
+                    "Please restart the editor as Administrator:\n"
+                    "Right-click → Run as administrator",
+                ),
             )
             return
 
@@ -26116,11 +26133,10 @@ QCheckBox::indicator {{
     def _buff_reset_vanilla_papgt(self) -> None:
         if not self._buff_ensure_patcher():
             return
-        if not self._is_admin():
+        if not self._is_admin(self._buff_patcher.game_path):
             QMessageBox.warning(
                 self, "Admin Required",
-                "Resetting PAPGT requires administrator privileges.\n\n"
-                "Right-click → Run as administrator",
+                self._write_permission_message("Resetting PAPGT", self._buff_patcher.game_path),
             )
             return
 
@@ -26168,11 +26184,10 @@ QCheckBox::indicator {{
         if not self._buff_ensure_patcher():
             return
 
-        if not self._is_admin():
+        if not self._is_admin(self._buff_patcher.game_path):
             QMessageBox.warning(
                 self, "Admin Required",
-                "Restoring game files requires administrator privileges.\n\n"
-                "Right-click → Run as administrator",
+                self._write_permission_message("Restoring game files", self._buff_patcher.game_path),
             )
             return
 
@@ -26898,9 +26913,10 @@ QCheckBox::indicator {{
         if not self._gd_editor or not self._gd_current_file:
             QMessageBox.warning(self, "Game Data", "Load a file first.")
             return
-        if not self._is_admin():
+        game_path = self._config.get("game_install_path", "")
+        if not self._is_admin(game_path):
             QMessageBox.warning(self, "Admin Required",
-                "Run as administrator to write game files.")
+                self._write_permission_message("Writing to game files", game_path))
             return
 
         reply = QMessageBox.question(
@@ -27686,10 +27702,10 @@ QCheckBox::indicator {{
                 "Set the correct path using the Browse button at the top.")
             return
 
-        if not self._is_admin():
+        if not self._is_admin(game_path):
             QMessageBox.warning(self, "Admin Required",
-                "Writing to game files requires administrator privileges.\n\n"
-                "Right-click the exe → Run as administrator")
+                self._write_permission_message("Writing to game files", game_path,
+                                               "Right-click the exe → Run as administrator"))
             return
 
         if hasattr(self, '_store_parser_v2') and self._store_parser_v2:
@@ -27796,7 +27812,7 @@ QCheckBox::indicator {{
             self._store_status.setText(f"Failed: {ex}")
             QMessageBox.critical(self, "Apply Failed",
                 f"{ex}\n\n"
-                f"Make sure you're running as administrator\n"
+                f"{self._write_permission_message('Writing to game files', game_path, 'Make sure you are running as administrator')}\n"
                 f"and crimson_rs is available.")
 
     def _store_restore(self) -> None:
@@ -27805,10 +27821,9 @@ QCheckBox::indicator {{
             QMessageBox.warning(self, "Restore", "Set a valid game path first.")
             return
 
-        if not self._is_admin():
+        if not self._is_admin(game_path):
             QMessageBox.warning(self, "Admin Required",
-                "Restoring game files requires administrator privileges.\n\n"
-                "Right-click → Run as administrator")
+                self._write_permission_message("Restoring game files", game_path))
             return
 
         import shutil
@@ -31246,11 +31261,11 @@ QCheckBox::indicator {{
     def _pack_browser_open_folder(self) -> None:
         for pack_dir in self._get_pack_dirs():
             if os.path.isdir(pack_dir):
-                os.startfile(pack_dir)
+                platform_paths.open_path(pack_dir)
                 return
         pack_dir = os.path.join(self._app_dir(), 'knowledge_packs')
         os.makedirs(pack_dir, exist_ok=True)
-        os.startfile(pack_dir)
+        platform_paths.open_path(pack_dir)
 
     def _build_backup_tab(self) -> None:
         tab = QWidget()
@@ -31363,12 +31378,18 @@ QCheckBox::indicator {{
     def _auto_find_save(self) -> None:
         saves = find_save_files()
         if not saves:
+            searched = platform_paths.save_root_candidates()
+            if not searched:
+                if platform_paths.is_windows():
+                    searched = [r"%LOCALAPPDATA%\Pearl Abyss\CD\save",
+                                r"%LOCALAPPDATA%\Pearl Abyss\CD_Epic\save"]
+                else:
+                    searched = [str(p / "drive_c/users/steamuser/AppData/Local/Pearl Abyss/CD/save")
+                                for p in platform_paths.steam_compatdata_dir()] or [str(Path.home())]
             QMessageBox.information(
                 self, "Auto-Find",
                 "No save files found in known locations.\n\n"
-                "Searched:\n"
-                "  %LOCALAPPDATA%/Pearl Abyss/CD/save/\n"
-                "  %LOCALAPPDATA%/Pearl Abyss/CD_Epic/save/"
+                "Searched:\n" + "\n".join(f"  {p}" for p in searched)
             )
             return
 
@@ -33647,7 +33668,7 @@ QCheckBox::indicator {{
             QMessageBox.information(self, "Backup Folder", "No save file loaded.")
             return
         os.makedirs(backup_dir, exist_ok=True)
-        os.startfile(backup_dir)
+        platform_paths.open_path(backup_dir)
 
 
     def _dragon_unlock_swap(self) -> None:

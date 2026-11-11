@@ -10,6 +10,7 @@ from __future__ import annotations
 import ctypes
 import json
 import os
+import platform_paths
 import sys
 import tempfile
 from pathlib import Path
@@ -36,8 +37,17 @@ def _application_dirs() -> list[Path]:
     return result
 
 
+def native_library_names() -> list[str]:
+    """Filename the C ABI backend is shipped as on this platform."""
+    if platform_paths.is_windows():
+        return ["parc_parser.dll"]
+    if platform_paths.is_macos():
+        return ["parc_parser.dylib"]
+    return ["libparc_parser.so"]
+
+
 class NativeSaveBackend:
-    """ctypes wrapper for ``parc_parser.dll`` backend API version 2.1+."""
+    """ctypes wrapper for the native parser library, backend API version 2.1+."""
 
     def __init__(self) -> None:
         self._dll: ctypes.CDLL | None = None
@@ -65,7 +75,10 @@ class NativeSaveBackend:
         return raw.decode("utf-8", errors="replace") if raw else "unknown"
 
     def _load(self) -> None:
-        candidates = [directory / "parc_parser.dll" for directory in _application_dirs()]
+        names = native_library_names()
+        candidates = [directory / name
+                      for name in names
+                      for directory in _application_dirs()]
         for dll_path in candidates:
             if not dll_path.is_file():
                 continue
@@ -123,7 +136,7 @@ class NativeSaveBackend:
                 self._load_error = f"Failed to load {dll_path}: {exc}"
 
         if not self._load_error:
-            self._load_error = "parc_parser.dll was not found beside the application"
+            self._load_error = f"{names[0]} was not found beside the application"
 
     def _require(self) -> ctypes.CDLL:
         if self._dll is None:

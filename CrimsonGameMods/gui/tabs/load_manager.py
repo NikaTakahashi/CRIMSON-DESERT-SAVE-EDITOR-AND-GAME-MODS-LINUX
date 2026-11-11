@@ -12,6 +12,8 @@ import logging
 import os
 import time
 
+import platform_paths
+
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QColor, QBrush, QFont
 from PySide6.QtWidgets import (
@@ -749,4 +751,4 @@ class LoadManagerTab(QWidget):
         if not gp or not os.path.isdir(gp):
             QMessageBox.warning(self, "Load Manager", "Game path not set.")
             return
-        os.startfile(gp)
+        platform_paths.open_path(gp)

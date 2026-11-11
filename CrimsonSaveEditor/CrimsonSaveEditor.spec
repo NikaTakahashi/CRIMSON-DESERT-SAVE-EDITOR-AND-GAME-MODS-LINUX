@@ -1,9 +1,20 @@
+import os
+
+_SPEC_DIR = SPECPATH
+
+# The native parser backend ships as a platform-specific shared object; package
+# whichever build exists beside the spec file.
+_NATIVE_BACKENDS = [
+    name for name in ('parc_parser.dll', 'libparc_parser.so', 'parc_parser.dylib')
+    if os.path.isfile(os.path.join(_SPEC_DIR, name))
+]
+
 a = Analysis(
     ['main.py'],
     pathex=[],
     binaries=[],
     datas=[
-        ('parc_parser.dll', '.'),
+        *((name, '.') for name in _NATIVE_BACKENDS),
         ('item_names.json', '.'),
         ('store_names.json', '.'),
         ('item_templates.json', '.'),
@@ -45,6 +56,7 @@ a = Analysis(
         'questinfo_parser',
         'item_template_db',
         'native_backend',
+        'platform_paths',
         'app_version',
         'startup_splash',
         'theme_support',

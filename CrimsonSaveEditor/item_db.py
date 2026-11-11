@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import datetime
+import platform_paths
 from typing import Dict, List, Optional
 
 from models import ItemInfo
@@ -17,6 +18,10 @@ SEARCH_PATHS = [
     os.path.join(os.path.dirname(os.path.abspath(__file__)), "item_names.json"),
     r"C:\Program Files (x86)\Steam\steamapps\common\Crimson Desert\bin64\CrimsonMods\item_names.json",
 ]
+for _install_dir in platform_paths.game_install_candidates():
+    _candidate = os.path.join(_install_dir, "bin64", "CrimsonMods", "item_names.json")
+    if _candidate not in SEARCH_PATHS:
+        SEARCH_PATHS.append(_candidate)
 
 
 class ItemNameDB:

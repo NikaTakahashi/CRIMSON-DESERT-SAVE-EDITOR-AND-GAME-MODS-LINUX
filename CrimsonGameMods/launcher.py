@@ -20,11 +20,14 @@ Build instructions:
 For development, this launcher just starts the main app normally.
 """
 import os
+import subprocess
 import sys
 import json
 import shutil
 import logging
 from pathlib import Path
+
+import platform_paths
 
 log = logging.getLogger(__name__)
 
@@ -110,10 +113,11 @@ def main():
         from gui.main_window import CrimsonDesktopEditor
         from PySide6.QtWidgets import QApplication
         from PySide6.QtGui import QIcon
-        import ctypes
 
-        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(
-            "CrimsonGameMods.unified")
+        if platform_paths.is_windows():
+            import ctypes
+            ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(
+                "CrimsonGameMods.unified")
 
         app = QApplication(sys.argv)
         app.setApplicationName("Crimson Desert - Game Mods & Mod Loader")
@@ -127,7 +131,7 @@ def main():
         sys.exit(app.exec())
     else:
         # Development mode — just import and run the normal entry point
-        os.system(f'python "{_get_app_dir() / "main.py"}"')
+        subprocess.run([sys.executable, str(_get_app_dir() / "main.py")])
 
 
 if __name__ == "__main__":

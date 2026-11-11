@@ -28,6 +28,8 @@ import sys
 import tempfile
 import traceback
 import textwrap
+
+import platform_paths
 from typing import Callable, List, Optional, Tuple
 
 from PySide6.QtCore import Qt, QSize, QTimer, Signal
@@ -241,15 +243,7 @@ def _can_write_game_dir(game_path: str) -> bool:
 
 
 def _is_game_running() -> bool:
-    try:
-        out = subprocess.check_output(
-            ["tasklist", "/FI", "IMAGENAME eq CrimsonDesert.exe", "/FO", "CSV", "/NH"],
-            stderr=subprocess.DEVNULL, text=True, timeout=3,
-            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
-        )
-        return "CrimsonDesert.exe" in out
-    except Exception:
-        return False
+    return platform_paths.is_process_running("CrimsonDesert.exe")
 
 
 class ItemBuffsTab(QWidget):

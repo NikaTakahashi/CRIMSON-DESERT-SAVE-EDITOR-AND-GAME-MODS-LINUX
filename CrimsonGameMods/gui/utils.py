@@ -1,10 +1,31 @@
 from __future__ import annotations
 
+import os
+from pathlib import Path
+
 from PySide6.QtCore import Qt, QPoint, QRect, QSize
 from PySide6.QtWidgets import (
     QLabel, QLayout, QPushButton, QSizePolicy, QStyle, QTableWidgetItem,
 )
 from gui.theme import COLORS
+import platform_paths
+
+
+def save_root_dialog_default() -> str:
+    """Start directory for save-file dialogs: first existing save root, else home."""
+    for root in platform_paths.save_root_candidates():
+        if os.path.isdir(root):
+            return root
+    return str(Path.home())
+
+
+def game_path_dialog_default() -> str:
+    """Start directory for game-path folder dialogs: first existing install
+    candidate, else the user's home folder."""
+    for cand in platform_paths.game_install_candidates():
+        if os.path.isdir(cand):
+            return cand
+    return str(Path.home())
 
 
 class FlowLayout(QLayout):

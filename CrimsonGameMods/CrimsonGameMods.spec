@@ -1,14 +1,37 @@
 # -*- mode: python ; coding: utf-8 -*-
 
+import os
+import sys
 from pathlib import Path
-Path("quest_packs").mkdir(exist_ok=True)
+
+Path(SPECPATH, "quest_packs").mkdir(exist_ok=True)
+
+# Native modules are per-platform. Bundle the build host's binary, and only if
+# the file exists, so Linux/macOS builds do not hard-fail on a Windows .pyd.
+if sys.platform.startswith("win"):
+    _dmm_binaries = [
+        ("dmm_parser/dmm_parser.pyd", "dmm_parser"),
+        ("dmm_parser/dmm_parser.abi3.so", "dmm_parser"),
+    ]
+else:
+    _dmm_binaries = [("dmm_parser/dmm_parser.abi3.so", "dmm_parser")]
+_dmm_binaries = [
+    (src, dst) for src, dst in _dmm_binaries
+    if os.path.isfile(os.path.join(SPECPATH, src))
+]
+
+_parc_name = ("parc_parser.dll" if sys.platform.startswith("win")
+             else "libparc_parser.dylib" if sys.platform == "darwin"
+             else "libparc_parser.so")
+_parc_datas = [(name, ".") for name in (_parc_name,)
+               if os.path.isfile(os.path.join(SPECPATH, name))]
 
 a = Analysis(
     ['main.py'],
-    pathex=['.'],
-    binaries=[('dmm_parser/dmm_parser.pyd', 'dmm_parser'), ('dmm_parser/dmm_parser.abi3.so', 'dmm_parser')],
-    datas=[('crimson_data.db.gz', '.'), ('data', 'data'), ('vfx_equip_attachments.json', '.'), ('parc_parser.dll', '.'), ('locale', 'locale'), ('knowledge_packs', 'knowledge_packs'), ('quest_packs', 'quest_packs'), ('dropset_packs', 'dropset_packs'), ('localizationstring_eng_items.tsv', '.'), ('pabgb_parser_local.py', '.'), ('crimson_rs', 'crimson_rs'), ('dmm_parser', 'dmm_parser'), ('game_baselines', 'game_baselines')],
-    hiddenimports=['table_layout', 'client_names', 'lz4', 'lz4.block', 'iteminfo_parser', 'cryptography', 'cryptography.hazmat.primitives.ciphers', 'cryptography.hazmat.primitives.ciphers.algorithms', 'parc_inserter3', 'storeinfo_parser', 'gamedata_editor', 'pabgb_field_parsers', 'universal_pabgb_parser', 'factionnode_operator_parser', 'fieldinfo_parser', 'vehicleinfo_parser', 'regioninfo_parser', 'armor_catalog', 'character_mesh_swap', 'gimmickinfo_parser', 'pipeline_report', 'characterinfo_full_parser', 'data_db', 'gui.tabs.buffs_v319', 'gui.tabs.field_edit', 'gui.tabs.skill_tree', 'gui.tabs.patches', 'gui.tabs.pas_editor', 'gui.tabs.reserveslot', 'gui.tabs.iteminfo_inspector', 'gui.tabs.mod_loader', 'gui.tabs.dmm_webview', 'gui.item_creator_dialog', 'gui.add_to_save_dialog', 'gui.iteminfo_index', 'gui.dialogs', 'gui.theme', 'gui.utils', 'gui_i18n', 'i18n', 'lang_pack_downloader', 'gui.language_picker', 'item_creator', 'skilltreeinfo_parser', 'skillinfo_parser', 'mercenaryinfo_parser', 'dropset_editor', 'equipslotinfo_parser', 'gui.tabs.stacker', 'gui.tabs.mercpets', 'gui.tabs.world', 'gui.tabs.bagspace', 'gui.tabs.items', 'gui.tabs.load_manager', 'gui.tabs.quest_mods', 'icon_cache', 'item_db', 'item_packs', 'item_scanner', 'models', 'paz_patcher', 'localization', 'overlay_coordinator', 'shared_state', 'reserveslot_parser', 'store_editor', 'wantedinfo_parser', 'terrain_spawn_parser'],
+    pathex=[SPECPATH],
+    binaries=_dmm_binaries,
+    datas=[('crimson_data.db.gz', '.'), ('data', 'data'), ('vfx_equip_attachments.json', '.'), *_parc_datas, ('locale', 'locale'), ('knowledge_packs', 'knowledge_packs'), ('quest_packs', 'quest_packs'), ('dropset_packs', 'dropset_packs'), ('localizationstring_eng_items.tsv', '.'), ('pabgb_parser_local.py', '.'), ('crimson_rs', 'crimson_rs'), ('dmm_parser', 'dmm_parser'), ('game_baselines', 'game_baselines')],
+    hiddenimports=['table_layout', 'client_names', 'lz4', 'lz4.block', 'iteminfo_parser', 'cryptography', 'cryptography.hazmat.primitives.ciphers', 'cryptography.hazmat.primitives.ciphers.algorithms', 'parc_inserter3', 'storeinfo_parser', 'gamedata_editor', 'pabgb_field_parsers', 'universal_pabgb_parser', 'factionnode_operator_parser', 'fieldinfo_parser', 'vehicleinfo_parser', 'regioninfo_parser', 'armor_catalog', 'character_mesh_swap', 'gimmickinfo_parser', 'pipeline_report', 'characterinfo_full_parser', 'data_db', 'gui.tabs.buffs_v319', 'gui.tabs.field_edit', 'gui.tabs.skill_tree', 'gui.tabs.patches', 'gui.tabs.pas_editor', 'gui.tabs.reserveslot', 'gui.tabs.iteminfo_inspector', 'gui.tabs.mod_loader', 'gui.tabs.dmm_webview', 'gui.item_creator_dialog', 'gui.add_to_save_dialog', 'gui.iteminfo_index', 'gui.dialogs', 'gui.theme', 'gui.utils', 'gui_i18n', 'i18n', 'lang_pack_downloader', 'gui.language_picker', 'item_creator', 'skilltreeinfo_parser', 'skillinfo_parser', 'mercenaryinfo_parser', 'dropset_editor', 'equipslotinfo_parser', 'gui.tabs.stacker', 'gui.tabs.mercpets', 'gui.tabs.world', 'gui.tabs.bagspace', 'gui.tabs.items', 'gui.tabs.load_manager', 'gui.tabs.quest_mods', 'icon_cache', 'item_db', 'item_packs', 'item_scanner', 'models', 'paz_patcher', 'localization', 'overlay_coordinator', 'shared_state', 'reserveslot_parser', 'store_editor', 'wantedinfo_parser', 'terrain_spawn_parser', 'platform_paths'],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],

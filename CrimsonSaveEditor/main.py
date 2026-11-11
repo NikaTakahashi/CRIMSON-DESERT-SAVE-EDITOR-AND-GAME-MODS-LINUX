@@ -4,6 +4,7 @@ import faulthandler
 import os
 import logging
 import platform
+import platform_paths
 import sys
 import threading
 import traceback
@@ -21,10 +22,7 @@ def _open_log_stream() -> tuple[str, object]:
     try:
         return preferred, open(preferred, "a", encoding="utf-8", buffering=1)
     except OSError:
-        fallback_dir = os.path.join(
-            os.environ.get("LOCALAPPDATA", os.getcwd()),
-            "CrimsonSaveEditor",
-        )
+        fallback_dir = str(platform_paths.app_data_dir())
         os.makedirs(fallback_dir, exist_ok=True)
         fallback = os.path.join(fallback_dir, "logs.txt")
         return fallback, open(fallback, "a", encoding="utf-8", buffering=1)

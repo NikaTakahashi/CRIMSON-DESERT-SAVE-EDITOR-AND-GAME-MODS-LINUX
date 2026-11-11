@@ -37,6 +37,8 @@ import ctypes
 import json as _json
 import tempfile
 
+from native_backend import native_library_names
+
 _dll = None
 _dll_loaded = False
 
@@ -47,31 +49,32 @@ def _load_dll():
         return _dll
     _dll_loaded = True
     for base in [_MY_DIR, getattr(sys, '_MEIPASS', _MY_DIR)]:
-        dll_path = os.path.join(base, 'parc_parser.dll')
-        if os.path.isfile(dll_path):
-            try:
-                _dll = ctypes.CDLL(dll_path)
-                _dll.parc_version.restype = ctypes.c_char_p
-                _dll.parc_parse_raw_file.argtypes = [
-                    ctypes.c_char_p,
-                    ctypes.POINTER(ctypes.c_char_p),
-                    ctypes.POINTER(ctypes.c_uint32),
-                ]
-                _dll.parc_parse_raw_file.restype = ctypes.c_int
-                _dll.parc_parse_blob.argtypes = [
-                    ctypes.POINTER(ctypes.c_uint8),
-                    ctypes.c_uint32,
-                    ctypes.POINTER(ctypes.c_char_p),
-                    ctypes.POINTER(ctypes.c_uint32),
-                ]
-                _dll.parc_parse_blob.restype = ctypes.c_int
-                _dll.parc_free.argtypes = [ctypes.c_void_p]
-                log.info("Loaded parc_parser.dll from %s (version: %s)",
-                         dll_path, _dll.parc_version().decode())
-                return _dll
-            except Exception as e:
-                log.warning("Failed to load parc_parser.dll: %s", e)
-                _dll = None
+        for name in native_library_names():
+            dll_path = os.path.join(base, name)
+            if os.path.isfile(dll_path):
+                try:
+                    _dll = ctypes.CDLL(dll_path)
+                    _dll.parc_version.restype = ctypes.c_char_p
+                    _dll.parc_parse_raw_file.argtypes = [
+                        ctypes.c_char_p,
+                        ctypes.POINTER(ctypes.c_char_p),
+                        ctypes.POINTER(ctypes.c_uint32),
+                    ]
+                    _dll.parc_parse_raw_file.restype = ctypes.c_int
+                    _dll.parc_parse_blob.argtypes = [
+                        ctypes.POINTER(ctypes.c_uint8),
+                        ctypes.c_uint32,
+                        ctypes.POINTER(ctypes.c_char_p),
+                        ctypes.POINTER(ctypes.c_uint32),
+                    ]
+                    _dll.parc_parse_blob.restype = ctypes.c_int
+                    _dll.parc_free.argtypes = [ctypes.c_void_p]
+                    log.info("Loaded %s from %s (version: %s)",
+                             name, dll_path, _dll.parc_version().decode())
+                    return _dll
+                except Exception as e:
+                    log.warning("Failed to load %s: %s", name, e)
+                    _dll = None
     return None
 
 
@@ -131,7 +134,7 @@ class _DllType:
 def _parse_tree_dll(blob: bytes) -> dict:
     dll = _load_dll()
     if dll is None:
-        raise RuntimeError("parc_parser.dll not available")
+        raise RuntimeError("native parser library not available")
 
     fd, temp_path = tempfile.mkstemp(suffix='.bin')
     try:

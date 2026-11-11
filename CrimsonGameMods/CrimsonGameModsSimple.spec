@@ -1,10 +1,30 @@
 # -*- mode: python ; coding: utf-8 -*-
 
+import os
+import sys
+
+# Native modules are per-platform. Bundle the build host's binary, and only if
+# the file exists, so Linux/macOS builds do not hard-fail on a Windows .pyd.
+if sys.platform.startswith("win"):
+    _dmm_binaries = [('dmm_parser/dmm_parser.pyd', 'dmm_parser')]
+else:
+    _dmm_binaries = [('dmm_parser/dmm_parser.abi3.so', 'dmm_parser')]
+_dmm_binaries = [
+    (src, dst) for src, dst in _dmm_binaries
+    if os.path.isfile(os.path.join(SPECPATH, src))
+]
+
+_parc_name = ("parc_parser.dll" if sys.platform.startswith("win")
+             else "libparc_parser.dylib" if sys.platform == "darwin"
+             else "libparc_parser.so")
+_parc_datas = [(name, ".") for name in (_parc_name,)
+               if os.path.isfile(os.path.join(SPECPATH, name))]
+
 a = Analysis(
     ['simple_launcher.py'],
     pathex=[],
-    binaries=[('dmm_parser/dmm_parser.pyd', 'dmm_parser')],
-    datas=[('crimson_rs', 'crimson_rs'), ('dmm_parser', 'dmm_parser'), ('crimson_data.db.gz', '.'), ('parc_parser.dll', '.')],
+    binaries=_dmm_binaries,
+    datas=[('crimson_rs', 'crimson_rs'), ('dmm_parser', 'dmm_parser'), ('crimson_data.db.gz', '.'), *_parc_datas],
     hiddenimports=[
         'lz4', 'lz4.block',
         'dmm_parser', 'dmm_parser.dmm_parser', 'dmm_parser.enums',
@@ -15,6 +35,7 @@ a = Analysis(
         'equipslotinfo_parser', 'shared_state', 'overlay_coordinator',
         'models',
         'inventory_parser_108', 'characterinfo_full_parser',
+        'platform_paths',
     ],
     hookspath=[],
     hooksconfig={},

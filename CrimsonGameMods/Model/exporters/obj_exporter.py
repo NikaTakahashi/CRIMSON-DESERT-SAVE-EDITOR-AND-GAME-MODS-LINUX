@@ -74,7 +74,7 @@ def write_mtl_from_model(model: ParsedModel, mtl_path: str,
             seen.add(mat)
 
             dds_base = material_to_dds_basename(mat)
-            tex_prefix = (".\\" + texture_rel_dir + "\\" + dds_base) if texture_rel_dir else dds_base
+            tex_prefix = ("./" + texture_rel_dir + "/" + dds_base) if texture_rel_dir else dds_base
 
             f.write(f"newmtl {mat}\n")
             f.write("Ka 0.2 0.2 0.2\n")
@@ -194,7 +194,7 @@ def write_mtl(meshes, mtl_path: str, texture_rel_dir: str = "",
             seen.add(mesh.material)
 
             dds_base = material_to_dds_basename(mesh.material)
-            tex_prefix = (".\\" + texture_rel_dir + "\\" + dds_base) if texture_rel_dir else dds_base
+            tex_prefix = ("./" + texture_rel_dir + "/" + dds_base) if texture_rel_dir else dds_base
 
             f.write(f"newmtl {mesh.material}\n")
             f.write("Ka 0.2 0.2 0.2\n")

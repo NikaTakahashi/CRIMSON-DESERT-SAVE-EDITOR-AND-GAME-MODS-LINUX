@@ -4,15 +4,7 @@
  * Insert/Remove modify the in-memory parse tree, then call the
  * tree-based serializer. No blob-level PO fixup. No offset tables.
  */
-#ifdef _WIN32
-#ifndef NOMINMAX
-#define NOMINMAX
-#endif
-#include <windows.h>
-#else
-#include <unistd.h>
-#define GetCurrentProcessId() ((unsigned)getpid())
-#endif
+#include "portable_temp.h"
 #include "parc_engine.h"
 #include "save_writer.h"
 #include <fstream>
@@ -139,12 +131,10 @@ void RebuildOffsetTables(SaveTree& tree) {
 // ── Reparse ──
 
 void Reparse(SaveTree& tree, bool rebuild_offsets) {
-    char tmp_path[512];
-    snprintf(tmp_path, sizeof(tmp_path), "%s\\parc_engine_%u.tmp",
-             getenv("TEMP") ? getenv("TEMP") : ".", (unsigned)GetCurrentProcessId());
-    WriteTempFile(tmp_path, tree.blob);
-    tree.parsed = SaveParserCpp::ParseRawFile(tmp_path);
-    std::remove(tmp_path);
+    auto tmp_path = PortableTemp::temp_file("parc_engine");
+    WriteTempFile(tmp_path.string(), tree.blob);
+    tree.parsed = SaveParserCpp::ParseRawFile(tmp_path.string());
+    PortableTemp::remove_file(tmp_path);
 
     tree.name_to_type_idx.clear();
     for (size_t i = 0; i < tree.parsed.schema.types.size(); ++i) {

@@ -25,6 +25,8 @@ from PySide6.QtWidgets import (
     QVBoxLayout, QWidget,
 )
 
+from gui.utils import save_root_dialog_default
+
 log = logging.getLogger(__name__)
 
 ICON_COL_PX = 28
@@ -193,8 +195,7 @@ class AddCustomItemToSaveDialog(QDialog):
         self._load_save()
 
     def _on_browse(self) -> None:
-        start = os.path.dirname(self._save_path) if self._save_path else \
-            os.path.expandvars(r"%LOCALAPPDATA%\Pearl Abyss\CD\save")
+        start = os.path.dirname(self._save_path) if self._save_path else save_root_dialog_default()
         if not os.path.isdir(start):
             start = os.path.expanduser("~")
         path, _ = QFileDialog.getOpenFileName(

@@ -27,16 +27,19 @@ from gui.dialogs import ItemSearchDialog
 from icon_cache import ICON_SIZE
 from gui.utils import make_scope_label, make_help_btn
 from i18n import tr
+import platform_paths
 
 log = logging.getLogger(__name__)
 
 
-def _is_admin() -> bool:
-    try:
-        import ctypes
-        return ctypes.windll.shell32.IsUserAnAdmin() != 0
-    except Exception:
-        return False
+def _is_admin(target: str = "") -> bool:
+    if platform_paths.is_windows():
+        try:
+            import ctypes
+            return ctypes.windll.shell32.IsUserAnAdmin() != 0
+        except Exception:
+            return False
+    return bool(target) and os.access(target, os.W_OK)
 
 
 class GameDataTab(QWidget):
@@ -358,9 +361,11 @@ class GameDataTab(QWidget):
         if not self._gd_editor or not self._gd_current_file:
             QMessageBox.warning(self, tr("Game Data"), tr("Load a file first."))
             return
-        if not _is_admin():
+        if not _is_admin(self._game_path):
             QMessageBox.warning(self, tr("Admin Required"),
-                tr("Run as administrator to write game files."))
+                tr("Run as administrator to write game files.") if platform_paths.is_windows()
+                else tr("No write permission for the game files.\n\n"
+                        "Check folder permissions on the game install path."))
             return
 
         reply = QMessageBox.question(
@@ -1411,9 +1416,11 @@ class StoreEditorTab(QWidget):
         except Exception as ex:
             log.exception("Unhandled exception")
             self._store_status.setText(f"Failed: {ex}")
+            hint = ("Make sure you're running as administrator"
+                    if platform_paths.is_windows()
+                    else "Make sure you have write permission for the game files")
             QMessageBox.critical(self, tr("Apply Failed"),
-                f"{ex}\n\n"
-                f"Make sure you're running as administrator\n"
+                f"{ex}\n\n{hint}\n"
                 f"and crimson_rs is available.")
 
     def _store_restore(self) -> None:
@@ -1422,10 +1429,12 @@ class StoreEditorTab(QWidget):
             QMessageBox.warning(self, tr("Restore"), tr("Set a valid game path first."))
             return
 
-        if not _is_admin():
+        if not _is_admin(game_path):
             QMessageBox.warning(self, tr("Admin Required"),
                 "Restoring game files requires administrator privileges.\n\n"
-                "Right-click → Run as administrator")
+                "Right-click → Run as administrator" if platform_paths.is_windows()
+                else "Restoring game files needs write permission.\n\n"
+                     "Check folder permissions on the game install path.")
             return
 
         import shutil
@@ -5383,4 +5392,4 @@ class BackupTab(QWidget):
             QMessageBox.information(self, tr("Backup Folder"), tr("No save file loaded."))
             return
         os.makedirs(backup_dir, exist_ok=True)
-        os.startfile(backup_dir)
+        platform_paths.open_path(backup_dir)

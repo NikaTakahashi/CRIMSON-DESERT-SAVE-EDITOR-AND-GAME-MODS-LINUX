@@ -9,6 +9,8 @@ import struct
 import sys
 import traceback
 
+import platform_paths
+
 
 log = logging.getLogger(__name__)
 from typing import List, Optional, Tuple
@@ -56,7 +58,7 @@ from gui.theme import (
     COLORS, CATEGORY_COLORS, _TAB_SELECTED_BG, _TAB_SELECTED_COLOR,
     _TAB_SELECTED_BORDER, DARK_STYLESHEET, LIGHT_STYLESHEET, apply_theme,
 )
-from gui.utils import _num_item
+from gui.utils import _num_item, game_path_dialog_default, save_root_dialog_default
 
 
 def find_save_files() -> List[dict]:
@@ -69,17 +71,9 @@ def find_save_files() -> List[dict]:
         epic_dir = os.path.join(local_app, "Pearl Abyss", "CD_Epic", "save")
         search_dirs.extend([steam_dir, epic_dir])
 
-    if sys.platform != "win32":
-        import pathlib
-        user = os.getenv("USER", "")
-        if user:
-            linux_steam = pathlib.Path(
-                f"/home/{user}/.local/share/Steam/steamapps/compatdata"
-                f"/3321460/pfx/drive_c/users/steamuser/AppData/Local"
-                f"/Pearl Abyss/CD/save"
-            )
-            if linux_steam.is_dir():
-                search_dirs.append(str(linux_steam))
+    for root in platform_paths.save_root_candidates():
+        if root not in search_dirs:
+            search_dirs.append(root)
 
     for base_dir in search_dirs:
         if not os.path.isdir(base_dir):
@@ -1004,16 +998,10 @@ class MainWindow(QMainWindow):
         if custom_appdata and os.path.isdir(custom_appdata):
             localappdata_paths.insert(0, custom_appdata)
 
-        if sys.platform != "win32":
-            user = os.getenv("USER", "")
-            if user:
-                linux_steam = os.path.join(
-                    f"/home/{user}/.local/share/Steam/steamapps/compatdata",
-                    "3321460/pfx/drive_c/users/steamuser/AppData/Local",
-                    "Pearl Abyss/CD/save",
-                )
-                if os.path.isdir(linux_steam) and linux_steam not in roots:
-                    roots.append(linux_steam)
+        if not platform_paths.is_windows():
+            for p in platform_paths.save_root_candidates():
+                if p not in roots:
+                    roots.append(p)
 
         for local in localappdata_paths:
             if not local:
@@ -1214,13 +1202,7 @@ class MainWindow(QMainWindow):
 
     @staticmethod
     def _open_folder(folder: str) -> None:
-        import subprocess
-        if sys.platform == 'win32':
-            os.startfile(folder)
-        elif sys.platform == 'darwin':
-            subprocess.Popen(['open', folder])
-        else:
-            subprocess.Popen(['xdg-open', folder])
+        platform_paths.open_path(folder)
 
     def _open_language_picker(self) -> None:
         try:
@@ -1253,7 +1235,7 @@ class MainWindow(QMainWindow):
         desc = QLabel(
             "If your game saves are on a different drive (D:, E:, etc.) or a custom location,\n"
             "set the path here. Leave empty for auto-detect.\n\n"
-            "Default: %LOCALAPPDATA%\\Pearl Abyss\\CD\\save"
+            f"Default: {save_root_dialog_default() if not platform_paths.is_windows() else r'%LOCALAPPDATA%\\Pearl Abyss\\CD\\save'}"
         )
         desc.setStyleSheet(f"color: {COLORS['text_dim']}; font-size: 10px;")
         layout.addWidget(desc)
@@ -1355,7 +1337,7 @@ class MainWindow(QMainWindow):
 
         open_lang_btn = QPushButton("Open Locale Folder")
         open_lang_btn.setStyleSheet(f"font-size: 10px; color: {COLORS['text_dim']};")
-        open_lang_btn.clicked.connect(lambda: os.startfile(os.path.join(self._app_dir(), 'locale')))
+        open_lang_btn.clicked.connect(lambda: self._open_folder(os.path.join(self._app_dir(), 'locale')))
         lang_btn_row.addWidget(open_lang_btn)
 
         lang_btn_row.addStretch()
@@ -2519,7 +2501,7 @@ QCheckBox::indicator {{
         current = self._config.get("game_install_path", "")
         path = QFileDialog.getExistingDirectory(
             self, "Select Crimson Desert Install Folder",
-            current or "C:\\"
+            current or game_path_dialog_default()
         )
         if not path:
             return
@@ -2946,11 +2928,11 @@ QCheckBox::indicator {{
     def _pack_browser_open_folder(self) -> None:
         for pack_dir in self._get_pack_dirs():
             if os.path.isdir(pack_dir):
-                os.startfile(pack_dir)
+                self._open_folder(pack_dir)
                 return
         pack_dir = os.path.join(self._app_dir(), 'knowledge_packs')
         os.makedirs(pack_dir, exist_ok=True)
-        os.startfile(pack_dir)
+        self._open_folder(pack_dir)
 
 
     def _setup_lazy_tab_loading(self) -> None:

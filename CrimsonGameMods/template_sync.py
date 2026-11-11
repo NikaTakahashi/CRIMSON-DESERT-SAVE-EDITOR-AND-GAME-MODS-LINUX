@@ -6,6 +6,7 @@ import json
 import logging
 import os
 import platform
+import platform_paths
 import struct
 import sys
 import time
@@ -27,6 +28,7 @@ _LOCAL_DB = os.path.join(_MY_DIR, 'item_templates.json')
 
 _SAVE_DIRS = [
     os.path.expandvars(r"%LOCALAPPDATA%\Pearl Abyss\CD\save"),
+    *platform_paths.save_root_candidates(),
 ]
 
 

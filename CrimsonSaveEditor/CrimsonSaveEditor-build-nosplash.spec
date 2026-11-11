@@ -1,9 +1,20 @@
+import os
+
+_SPEC_DIR = SPECPATH
+
+# The native parser backend ships as a platform-specific shared object; package
+# whichever build exists beside the spec file.
+_NATIVE_BACKENDS = [
+    name for name in ('parc_parser.dll', 'libparc_parser.so', 'parc_parser.dylib')
+    if os.path.isfile(os.path.join(_SPEC_DIR, name))
+]
+
 a = Analysis(
     ['main.py'],
     pathex=[],
     binaries=[],
     datas=[
-        ('parc_parser.dll', '.'),
+        *((name, '.') for name in _NATIVE_BACKENDS),
         ('item_names.json', '.'),
         ('store_names.json', '.'),
         ('item_templates.json', '.'),
@@ -45,6 +56,7 @@ a = Analysis(
         'questinfo_parser',
         'item_template_db',
         'native_backend',
+        'platform_paths',
         'app_version',
         'startup_splash',
         'theme_support',
@@ -86,27 +98,37 @@ a = Analysis(
 )
 
 # Qt's GUI hook discovers optional PDF and virtual-keyboard plugins.  Those
-# plugins pull QtNetwork back in as a native DLL even when QtNetwork's Python
-# module is excluded.  The editor uses none of them, so strip that whole
-# dependency chain from the package.
+# plugins pull QtNetwork back in as a native library even when QtNetwork's
+# Python module is excluded.  The editor uses none of them, so strip that whole
+# dependency chain from the package; the shared objects are .dll on Windows,
+# .so on Linux and .dylib on macOS.
 _blocked_qt_binaries = {
-    'qpdf.dll',
-    'qtvirtualkeyboardplugin.dll',
-    'qtuiotouchplugin.dll',
-    'qt6pdf.dll',
-    'qt6virtualkeyboard.dll',
-    'qt6network.dll',
-    'qt6quick.dll',
-    'qt6qml.dll',
-    'qt6qmlmeta.dll',
-    'qt6qmlmodels.dll',
-    'qt6qmlworkerscript.dll',
+    'qpdf',
+    'qtvirtualkeyboardplugin',
+    'qtuiotouchplugin',
+    'qt6pdf',
+    'qt6virtualkeyboard',
+    'qt6network',
+    'qt6quick',
+    'qt6qml',
+    'qt6qmlmeta',
+    'qt6qmlmodels',
+    'qt6qmlworkerscript',
 }
-a.binaries = [
-    entry for entry in a.binaries
-    if entry[0].replace('\\', '/').rsplit('/', 1)[-1].lower()
-    not in _blocked_qt_binaries
-]
+
+
+def _is_blocked_binary(name: str) -> bool:
+    stem = str(name).replace('\\', '/').rsplit('/', 1)[-1].lower()
+    for suffix in ('.dll', '.so', '.dylib'):
+        if stem.endswith(suffix):
+            stem = stem[:-len(suffix)]
+            break
+    if stem.startswith('lib'):
+        stem = stem[3:]
+    return stem in _blocked_qt_binaries
+
+
+a.binaries = [entry for entry in a.binaries if not _is_blocked_binary(entry[0])]
 
 pyz = PYZ(a.pure)
 

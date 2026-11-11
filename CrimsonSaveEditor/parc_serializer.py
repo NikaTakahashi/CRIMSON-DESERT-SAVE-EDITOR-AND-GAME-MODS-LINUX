@@ -1307,9 +1307,15 @@ def verify_round_trip(original_blob: bytes) -> Tuple[bool, str]:
 if __name__ == "__main__":
     import sys
     import os
+    import platform_paths
 
-    SAVE_PATH = r"C:\Users\Coding\AppData\Local\Pearl Abyss\CD\save\57173764\slot0\save.save"
-    RAW_PATH = r"C:\Users\Coding\CrimsonDesertModding\test_blob.bin"
+    # Demo inputs: $CD_SAVE_DIR / $CD_TEST_BLOB override the platform defaults.
+    _roots = platform_paths.save_root_candidates()
+    SAVE_PATH = os.environ.get("CD_SAVE_DIR") or (
+        os.path.join(_roots[0], "slot0", "save.save") if _roots
+        else os.path.join(os.path.expanduser("~"), "save.save"))
+    RAW_PATH = os.environ.get("CD_TEST_BLOB") or os.path.join(
+        os.path.expanduser("~"), "CrimsonDesertModding", "test_blob.bin")
 
     blob = None
 

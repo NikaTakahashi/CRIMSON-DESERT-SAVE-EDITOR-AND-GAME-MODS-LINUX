@@ -187,7 +187,8 @@ class DmmWebViewTab(QWidget):
             dmm_dir = os.path.dirname(self._dmm_exe)
             self._dmm_process = subprocess.Popen(
                 [self._dmm_exe], cwd=dmm_dir,
-                creationflags=subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP,
+                creationflags=getattr(subprocess, "DETACHED_PROCESS", 0)
+                | getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0),
             )
             self._update_status()
             self.status_message.emit("DMM launched")

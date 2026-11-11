@@ -6,6 +6,8 @@ import os
 import struct
 import threading
 
+import platform_paths
+
 from data_db import get_connection
 
 from typing import Callable, Dict, List, Optional, Tuple
@@ -2108,12 +2110,13 @@ class DyeTab(QWidget):
 
     def _dye_find_cli(self) -> Optional[str]:
         import sys as _sys
+        exe_name = "dye_cli.exe" if platform_paths.is_windows() else "dye_cli"
         candidates = [
-            os.path.join(os.path.dirname(os.path.abspath(_sys.argv[0])), "dye_cli.exe"),
-            os.path.join(os.path.dirname(os.path.abspath(__file__)), "dye_cli.exe"),
+            os.path.join(os.path.dirname(os.path.abspath(_sys.argv[0])), exe_name),
+            os.path.join(os.path.dirname(os.path.abspath(__file__)), exe_name),
         ]
         if hasattr(_sys, '_MEIPASS'):
-            candidates.insert(0, os.path.join(_sys._MEIPASS, "dye_cli.exe"))
+            candidates.insert(0, os.path.join(_sys._MEIPASS, exe_name))
         for c in candidates:
             if os.path.isfile(c):
                 return c

@@ -26,6 +26,8 @@ from dataclasses import dataclass, field  # field: default_factory for mutable d
 from pathlib import Path
 from typing import Optional
 
+import platform_paths
+
 from . import iteminfo_inspector
 from PySide6.QtCore import Qt, Signal, QSize
 from PySide6.QtGui import QDragEnterEvent, QDropEvent, QFontMetrics, QColor
@@ -3195,10 +3197,10 @@ class StackerTab(QWidget):
                 QMessageBox.Yes | QMessageBox.No, QMessageBox.Yes)
             if reply == QMessageBox.Yes:
                 try:
-                    os.startfile(out_dir)
+                    platform_paths.open_path(out_dir)
                 except Exception:
                     pass
-            return
+                return
 
         # Direct-install path
         single_grp = getattr(self, '_single_stack_group', None)
@@ -5143,17 +5145,20 @@ class StackerTab(QWidget):
         try:
             import importlib.util
             legacy_pyd = None
+            suffixes = ('pyd',) if platform_paths.is_windows() else ('abi3.so', 'so', 'dylib')
             for base in [os.path.dirname(os.path.abspath(__file__)),
                          getattr(sys, '_MEIPASS', ''), os.getcwd()]:
-                for rel in [
-                    os.path.join(base, '..', '..', 'crimson_rs',
-                                 '_legacy', 'crimson_rs.pyd'),
-                    os.path.join(base, 'crimson_rs', '_legacy',
-                                 'crimson_rs.pyd'),
+                for rel_dir in [
+                    os.path.join(base, '..', '..', 'crimson_rs', '_legacy'),
+                    os.path.join(base, 'crimson_rs', '_legacy'),
                 ]:
-                    p = os.path.normpath(rel)
-                    if os.path.isfile(p):
-                        legacy_pyd = p
+                    for suffix in suffixes:
+                        p = os.path.normpath(
+                            os.path.join(rel_dir, f"crimson_rs.{suffix}"))
+                        if os.path.isfile(p):
+                            legacy_pyd = p
+                            break
+                    if legacy_pyd:
                         break
                 if legacy_pyd:
                     break

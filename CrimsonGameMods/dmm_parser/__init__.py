@@ -7,6 +7,33 @@
 # of CDMTL v1.0 §4.9 (No Competing Implementation) and §4.10
 # (AI-Mediated Access). CMI removal violates 17 U.S.C. §1202.
 
+import importlib.machinery
+import importlib.util
+from pathlib import Path
+
+
+def _load_native_extension() -> None:
+    """Load the packaged native extension when the submodule import cannot resolve it.
+
+    Linux/macOS ship the extension as `dmm_parser.abi3.so`, a filename the plain
+    `dmm_parser.dmm_parser` import never finds, so load it explicitly under the
+    name its init symbol expects.
+    """
+    here = Path(__file__).resolve().parent
+    for file_name in ("dmm_parser.abi3.so", "dmm_parser.so"):
+        candidate = here / file_name
+        if not candidate.is_file():
+            continue
+        loader = importlib.machinery.ExtensionFileLoader("dmm_parser", str(candidate))
+        spec = importlib.util.spec_from_loader("dmm_parser", loader)
+        module = importlib.util.module_from_spec(spec)
+        loader.exec_module(module)
+        globals().update(
+            {name: value for name, value in vars(module).items() if not name.startswith("_")}
+        )
+        return
+
+
 try:
     from dmm_parser.dmm_parser import *  # type: ignore[no-redef]
 except ModuleNotFoundError:
@@ -14,7 +41,10 @@ except ModuleNotFoundError:
     # tooling under `dmm_parser.tools` (validate / pack / inspect / diff)
     # only needs the native module for asset-level format checks; the
     # rest of the toolkit still works.
-    pass
+    try:
+        _load_native_extension()
+    except ImportError as exc:
+        print(f"Native dmm_parser extension unavailable: {exc}")
 
 from dmm_parser.enums import Compression, Crypto, Language
 

@@ -9,6 +9,8 @@ from typing import Optional, Tuple
 from urllib.request import urlopen, Request
 from urllib.error import URLError
 
+import platform_paths
+
 log = logging.getLogger(__name__)
 
 
@@ -27,12 +29,26 @@ VERSION_URL = (
     f"{_MANIFEST_BY_VARIANT.get(APP_VARIANT, 'editor_version.json')}"
 )
 
-_UPDATE_EXE_NAME = {
-    "gamemods":   "CrimsonGameMods_update.exe",
-    "standalone": "CrimsonSaveEditorStandalone_update.exe",
-    "full":       "CrimsonSaveEditor_update.exe",
+_UPDATE_BASE_NAME = {
+    "gamemods":   "CrimsonGameMods_update",
+    "standalone": "CrimsonSaveEditorStandalone_update",
+    "full":       "CrimsonSaveEditor_update",
 }[APP_VARIANT]
-_UPDATE_ZIP_NAME = _UPDATE_EXE_NAME.replace(".exe", ".zip")
+# Native binaries carry no extension on Linux/macOS; .exe only on Windows.
+_UPDATE_EXE_NAME = _UPDATE_BASE_NAME + (".exe" if platform_paths.is_windows() else "")
+_UPDATE_ZIP_NAME = _UPDATE_BASE_NAME + ".zip"
+
+_EXEC_MAGICS = {
+    "win": (b"MZ",),
+    "darwin": (b"\xfe\xed", b"\xcf\xfa", b"\xca\xfe"),
+    "linux": (b"\x7fE",),
+}
+
+
+def _is_executable_magic(magic: bytes) -> bool:
+    key = ("win" if platform_paths.is_windows()
+           else ("darwin" if platform_paths.is_macos() else "linux"))
+    return magic in _EXEC_MAGICS[key]
 
 
 def _version_tuple(v: str) -> tuple:
@@ -107,10 +123,19 @@ def download_update(url: str, progress_callback=None) -> Optional[str]:
         if magic == b"PK":
             import zipfile
             with zipfile.ZipFile(download_path, "r") as zf:
-                exe_names = [n for n in zf.namelist() if n.lower().endswith(".exe")]
+                if platform_paths.is_windows():
+                    exe_names = [n for n in zf.namelist() if n.lower().endswith(".exe")]
+                else:
+                    # Native builds: extensionless binaries or .so/.dylib members.
+                    exe_names = [
+                        n for n in zf.namelist()
+                        if not n.endswith("/")
+                        and (n.lower().endswith((".so", ".abi3.so", ".dylib"))
+                             or not os.path.splitext(n)[1])
+                    ]
                 if not exe_names:
                     os.remove(download_path)
-                    log.error("Zip contains no .exe files: %s", zf.namelist())
+                    log.error("Zip contains no executable files: %s", zf.namelist())
                     return None
                 target = next(
                     (n for n in exe_names if "crimsonsaveeditor" in n.lower()),
@@ -121,20 +146,20 @@ def download_update(url: str, progress_callback=None) -> Optional[str]:
                     shutil.copyfileobj(src, dst)
             os.remove(download_path)
             log.info("Extracted %s from zip", target)
-        elif magic == b"MZ":
+        elif _is_executable_magic(magic):
             if download_path != update_path:
                 if os.path.exists(update_path):
                     os.remove(update_path)
                 os.rename(download_path, update_path)
         else:
             os.remove(download_path)
-            log.error("Downloaded file is not a valid exe or zip (magic=%s)", magic.hex())
+            log.error("Downloaded file is not a valid executable or zip (magic=%s)", magic.hex())
             return None
 
         with open(update_path, "rb") as f:
-            if f.read(2) != b"MZ":
+            if not _is_executable_magic(f.read(2)):
                 os.remove(update_path)
-                log.error("Extracted file is not a valid executable")
+                log.error("Extracted file is not a valid executable for this platform")
                 return None
 
         log.info("Downloaded update to %s (%d bytes)", update_path, downloaded)
@@ -153,7 +178,6 @@ def apply_update_and_restart(update_path: str) -> None:
         return
 
     exe_dir = os.path.dirname(current_exe)
-    bat_path = os.path.join(exe_dir, "_update.bat")
     current_name = os.path.basename(current_exe)
     update_name = os.path.basename(update_path)
 
@@ -161,7 +185,11 @@ def apply_update_and_restart(update_path: str) -> None:
     update_full = os.path.join(exe_dir, update_name)
     log_path = os.path.join(exe_dir, "_update.log")
 
-    bat_content = f"""@echo off
+    import subprocess
+
+    if platform_paths.is_windows():
+        script_path = os.path.join(exe_dir, "_update.bat")
+        script_content = f"""@echo off
 echo [%date% %time%] Update script started > "{log_path}"
 
 :: Wait for the old exe to be deletable (unlocked)
@@ -199,15 +227,52 @@ echo Update failed, see log >> "{log_path}"
 :cleanup
 (goto) 2>nul & del /f "%~f0"
 """
-    with open(bat_path, "w") as f:
-        f.write(bat_content)
+    else:
+        # Never replace or launch a Windows PE binary on a non-Windows host.
+        with open(update_path, "rb") as f:
+            if not _is_executable_magic(f.read(2)):
+                log.error("Update is not a native executable for this platform; refusing to run it.")
+                return
 
-    log.info("Launching update script: %s", bat_path)
+        script_path = os.path.join(exe_dir, "_update.sh")
+        script_content = f"""#!/bin/sh
+echo "[`date`] Update script started" > "{log_path}"
 
-    import subprocess
-    subprocess.Popen(
-        ["cmd", "/c", bat_path],
-        cwd=exe_dir,
-        creationflags=subprocess.DETACHED_PROCESS,
-    )
+retries=0
+while [ "$retries" -lt 30 ]; do
+    rm -f "{current_full}" 2>/dev/null
+    [ ! -e "{current_full}" ] && break
+    retries=$((retries+1))
+    sleep 1
+done
+
+if [ -e "{current_full}" ]; then
+    echo "FAILED: Could not replace old binary after $retries retries" >> "{log_path}"
+    echo "Update failed, see log" >> "{log_path}"
+    rm -f "$0"
+    exit 1
+fi
+
+mv "{update_full}" "{current_full}"
+chmod +x "{current_full}"
+
+echo "Renamed update binary successfully" >> "{log_path}"
+echo "Done. Please reopen the app." >> "{log_path}"
+rm -f "$0"
+"""
+
+    with open(script_path, "w") as f:
+        f.write(script_content)
+
+    log.info("Launching update script: %s", script_path)
+
+    if platform_paths.is_windows():
+        subprocess.Popen(
+            ["cmd", "/c", script_path],
+            cwd=exe_dir,
+            creationflags=subprocess.DETACHED_PROCESS,
+        )
+    else:
+        os.chmod(script_path, 0o755)
+        subprocess.Popen(["/bin/sh", script_path], cwd=exe_dir)
     sys.exit(0)

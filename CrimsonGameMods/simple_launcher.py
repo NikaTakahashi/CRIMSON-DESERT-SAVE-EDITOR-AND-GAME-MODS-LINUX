@@ -12,6 +12,8 @@ import sys
 import tempfile
 from typing import Optional
 
+import platform_paths
+
 from PySide6.QtCore import Qt, QThread, Signal
 from PySide6.QtGui import QFont, QColor
 from PySide6.QtWidgets import (
@@ -150,13 +152,15 @@ MOD_DEFS = [
 # ─── Utilities ────────────────────────────────────────────────────────
 def find_game_path() -> str:
     candidates = []
-    for letter in string.ascii_uppercase:
-        candidates.append(f"{letter}:\\SteamLibrary\\steamapps\\common\\Crimson Desert")
-    candidates.extend([
-        r"C:\Program Files (x86)\Steam\steamapps\common\Crimson Desert",
-        r"C:\Program Files\Steam\steamapps\common\Crimson Desert",
-        r"C:\Program Files\Epic Games\CrimsonDesert",
-    ])
+    if platform_paths.is_windows():
+        for letter in string.ascii_uppercase:
+            candidates.append(f"{letter}:\\SteamLibrary\\steamapps\\common\\Crimson Desert")
+        candidates.extend([
+            r"C:\Program Files (x86)\Steam\steamapps\common\Crimson Desert",
+            r"C:\Program Files\Steam\steamapps\common\Crimson Desert",
+            r"C:\Program Files\Epic Games\CrimsonDesert",
+        ])
+    candidates.extend(platform_paths.game_install_candidates())
     for p in candidates:
         if os.path.isfile(os.path.join(p, "0008", "0.paz")):
             return p
@@ -164,14 +168,7 @@ def find_game_path() -> str:
 
 
 def is_game_running() -> bool:
-    try:
-        out = subprocess.check_output(
-            ["tasklist", "/FI", "IMAGENAME eq CrimsonDesert.exe", "/FO", "CSV", "/NH"],
-            stderr=subprocess.DEVNULL, text=True, timeout=3,
-            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
-        return "CrimsonDesert.exe" in out
-    except Exception:
-        return False
+    return platform_paths.is_process_running("CrimsonDesert.exe")
 
 
 def can_write_game_dir(gp: str) -> bool:
@@ -1156,8 +1153,10 @@ class SimpleWindow(QWidget):
             QMessageBox.warning(self, "Game Running", "Close the game first.")
             return False
         if not can_write_game_dir(self._game_path):
+            hint = ("Run as Administrator." if platform_paths.is_windows()
+                    else "Check folder permissions on the game install path.")
             QMessageBox.warning(self, "No Write Access",
-                f"Cannot write to:\n{self._game_path}\n\nRun as Administrator.")
+                f"Cannot write to:\n{self._game_path}\n\n{hint}")
             return False
         return True
 
@@ -1246,7 +1245,7 @@ class SimpleWindow(QWidget):
                     break
         if not os.path.isfile(exe):
             try:
-                os.startfile("steam://rungameid/2467650")
+                platform_paths.open_path("steam://rungameid/2467650")
                 self._status.setText("Launching via Steam...")
                 self._status.setStyleSheet(f"color: {SUCCESS}; font-size: 11px;")
             except Exception:

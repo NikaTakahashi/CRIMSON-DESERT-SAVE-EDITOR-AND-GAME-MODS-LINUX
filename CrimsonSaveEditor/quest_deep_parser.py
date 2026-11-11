@@ -2,6 +2,7 @@ import struct
 import json
 import os
 import logging
+import platform_paths
 
 log = logging.getLogger(__name__)
 
@@ -491,7 +492,7 @@ def load_pabgb_cross_refs(data, quest_stages_path=None):
     try:
         import questinfo_parser
         import crimson_rs
-        game_path = 'C:/Program Files (x86)/Steam/steamapps/common/Crimson Desert'
+        game_path = os.environ.get('CD_GAME_PATH') or (platform_paths.game_install_candidates() or [''])[0]
         dp = 'gamedata/binary__/client/bin'
         body = crimson_rs.extract_file(game_path, '0008', dp, 'questinfo.pabgb')
         gh = crimson_rs.extract_file(game_path, '0008', dp, 'questinfo.pabgh')

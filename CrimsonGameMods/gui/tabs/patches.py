@@ -24,11 +24,22 @@ from PySide6.QtWidgets import (
 )
 
 from gui.theme import COLORS
-from gui.utils import make_scope_label, make_help_btn
+from gui.utils import make_scope_label, make_help_btn, game_path_dialog_default
 from i18n import tr
 from paz_patcher import PazPatch, PazPatchManager, VehiclePatcher
+import platform_paths
 
 log = logging.getLogger(__name__)
+
+
+def _is_admin(target: str = "") -> bool:
+    if platform_paths.is_windows():
+        try:
+            import ctypes
+            return ctypes.windll.shell32.IsUserAnAdmin() != 0
+        except Exception:
+            return False
+    return bool(target) and os.access(target, os.W_OK)
 
 
 def _validate_game_path(path: str) -> bool:
@@ -307,7 +318,7 @@ class GamePatchesTab(QWidget):
         current = self._paz_game_path.text().strip() or self._config.get("game_install_path", "")
         path = QFileDialog.getExistingDirectory(
             self, "Select Crimson Desert Install Folder",
-            current or "C:\\"
+            current or game_path_dialog_default()
         )
         if path:
             if not _validate_game_path(path):
@@ -477,10 +488,12 @@ class GamePatchesTab(QWidget):
             QMessageBox.warning(self, tr("No Game Path"), tr("Set the game install path first."))
             return
 
-        if not self._is_admin():
+        if not _is_admin(game_path):
             QMessageBox.warning(self, tr("Admin Required"),
                                 "Writing to game files requires administrator privileges.\n\n"
-                                "Right-click → Run as administrator")
+                                "Right-click → Run as administrator" if platform_paths.is_windows()
+                                else "No write permission for the game files.\n\n"
+                                     "Check folder permissions on the game install path.")
             return
 
         reply = QMessageBox.question(
@@ -527,10 +540,12 @@ class GamePatchesTab(QWidget):
         if not game_path:
             QMessageBox.warning(self, tr("No Game Path"), tr("Set the game install path first."))
             return
-        if not self._is_admin():
+        if not _is_admin(game_path):
             QMessageBox.warning(self, tr("Admin Required"),
                                 "Writing to game files requires administrator privileges.\n"
-                                "Right-click → Run as administrator")
+                                "Right-click → Run as administrator" if platform_paths.is_windows()
+                                else "No write permission for the game files.\n"
+                                     "Check folder permissions on the game install path.")
             return
 
         reply = QMessageBox.question(
@@ -579,10 +594,12 @@ class GamePatchesTab(QWidget):
         if not game_path:
             QMessageBox.warning(self, tr("No Game Path"), tr("Set the game install path first."))
             return
-        if not self._is_admin():
+        if not _is_admin(game_path):
             QMessageBox.warning(self, tr("Admin Required"),
                                 "Writing to game files requires administrator privileges.\n"
-                                "Right-click → Run as administrator")
+                                "Right-click → Run as administrator" if platform_paths.is_windows()
+                                else "No write permission for the game files.\n"
+                                     "Check folder permissions on the game install path.")
             return
 
         reply = QMessageBox.question(

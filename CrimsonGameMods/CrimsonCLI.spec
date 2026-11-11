@@ -12,6 +12,7 @@ a = Analysis(
     hiddenimports=[
         'crimson_rs', 'crimson_rs.enums', 'crimson_rs.pack_mod',
         'cli_core',
+        'platform_paths',
     ],
     hookspath=[],
     hooksconfig={},

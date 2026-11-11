@@ -7,6 +7,8 @@ import shutil
 import string
 import struct
 from dataclasses import dataclass, field
+
+import platform_paths
 from typing import Any, Dict, List, Optional, Set, Tuple
 
 try:
@@ -222,17 +224,20 @@ class PazPatchManager:
     def find_game_path() -> str:
         candidates = []
 
-        for letter in string.ascii_uppercase:
-            candidates.append(
-                f"{letter}:\\SteamLibrary\\steamapps\\common\\Crimson Desert"
-            )
+        if platform_paths.is_windows():
+            for letter in string.ascii_uppercase:
+                candidates.append(
+                    f"{letter}:\\SteamLibrary\\steamapps\\common\\Crimson Desert"
+                )
 
-        candidates.extend([
-            r"C:\Program Files (x86)\Steam\steamapps\common\Crimson Desert",
-            r"C:\Program Files\Steam\steamapps\common\Crimson Desert",
-        ])
+            candidates.extend([
+                r"C:\Program Files (x86)\Steam\steamapps\common\Crimson Desert",
+                r"C:\Program Files\Steam\steamapps\common\Crimson Desert",
+            ])
 
-        candidates.append(r"C:\Program Files\Epic Games\CrimsonDesert")
+            candidates.append(r"C:\Program Files\Epic Games\CrimsonDesert")
+
+        candidates.extend(platform_paths.game_install_candidates())
 
         for path in candidates:
             paz = os.path.join(path, "0008", "0.paz")

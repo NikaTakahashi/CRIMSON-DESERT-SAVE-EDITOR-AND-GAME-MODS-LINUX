@@ -35,17 +35,9 @@
  * recomputed by ParcSerializer. Types and fields resolve BY NAME against the
  * importing save's schema, so node files are shareable across saves.
  */
-#ifndef NOMINMAX
-#define NOMINMAX
-#endif
+#include "portable_temp.h"
 #include "parc_xml.h"
 #include "pugixml.hpp"
-#ifdef _WIN32
-#include <windows.h>
-#else
-#include <unistd.h>
-#define GetCurrentProcessId() ((unsigned)getpid())
-#endif
 #include <algorithm>
 #include <cctype>
 #include <cmath>
@@ -860,14 +852,12 @@ static std::string ImportXmlDoc(pugi::xml_document& doc,
 
         // Self-check: the produced blob must parse and reserialize identically.
         {
-            char tmp[512];
-            snprintf(tmp, sizeof(tmp), "%s\\parc_xml_%u.tmp",
-                     getenv("TEMP") ? getenv("TEMP") : ".", (unsigned)GetCurrentProcessId());
+            auto tmp = PortableTemp::temp_file("parc_xml");
             std::ofstream o(tmp, std::ios::binary);
             o.write((const char*)out_blob.data(), (std::streamsize)out_blob.size());
             o.close();
-            ParseResult check = SaveParserCpp::ParseRawFile(tmp);
-            std::remove(tmp);
+            ParseResult check = SaveParserCpp::ParseRawFile(tmp.string());
+            PortableTemp::remove_file(tmp);
             auto re = ParcSerializer::Serialize(check, out_blob);
             if (re != out_blob) {
                 return "Self-check failed: imported blob does not reserialize identically "

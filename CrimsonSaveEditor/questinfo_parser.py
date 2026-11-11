@@ -1,6 +1,7 @@
 import struct
 import json
 import os
+import platform_paths
 
 
 def _u32(D, p):
@@ -168,7 +169,7 @@ if __name__ == '__main__':
 
     try:
         import crimson_rs
-        game_path = 'C:/Program Files (x86)/Steam/steamapps/common/Crimson Desert'
+        game_path = os.environ.get('CD_GAME_PATH') or (platform_paths.game_install_candidates() or [''])[0]
         dp = 'gamedata/binary__/client/bin'
         body = crimson_rs.extract_file(game_path, '0008', dp, 'questinfo.pabgb')
         gh = crimson_rs.extract_file(game_path, '0008', dp, 'questinfo.pabgh')
@@ -178,9 +179,11 @@ if __name__ == '__main__':
         with tempfile.NamedTemporaryFile(suffix='.pabgh', delete=False) as f:
             f.write(gh); pg = f.name
     except:
-        EXT = 'C:/Users/Coding/CrimsonDesertModding/extractedpaz/0008_full'
-        pb = f'{EXT}/questinfo.pabgb'
-        pg = f'{EXT}/questinfo.pabgh'
+        # $CD_EXTRACTED_DIR overrides the default offline extract folder.
+        EXT = os.environ.get('CD_EXTRACTED_DIR') or os.path.join(
+            os.path.expanduser('~'), 'CrimsonDesertModding', 'extractedpaz', '0008_full')
+        pb = os.path.join(EXT, 'questinfo.pabgb')
+        pg = os.path.join(EXT, 'questinfo.pabgh')
 
     entries, failures = parse_all(pb, pg)
     print(f"Parsed: {len(entries)} entries, {failures} failures")

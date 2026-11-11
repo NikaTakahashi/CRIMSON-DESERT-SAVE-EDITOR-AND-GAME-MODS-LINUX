@@ -25,6 +25,8 @@ import struct
 import sys
 import time
 from pathlib import Path
+
+import platform_paths
 from typing import Optional
 
 from PySide6.QtCore import Qt, Signal, QTimer, QThread, QSize
@@ -85,12 +87,16 @@ def _find_dmm_exe(search_root: Optional[Path] = None) -> Optional[str]:
     if search_root:
         candidates.append(search_root)
 
-    for base in [
+    bases = [
         Path(os.environ.get("LOCALAPPDATA", "x")) / "Programs",
         Path(os.environ.get("PROGRAMFILES", "x")),
         Path(os.environ.get("USERPROFILE", "x")) / "Desktop",
         Path(os.environ.get("USERPROFILE", "x")) / "Downloads",
-    ]:
+    ]
+    if not platform_paths.is_windows():
+        bases.extend([Path.home() / "Desktop", Path.home() / "Downloads"])
+
+    for base in bases:
         if base.is_dir():
             candidates.append(base)
 
@@ -602,7 +608,8 @@ class ModLoaderTab(QWidget):
             self._dmm_process = subprocess.Popen(
                 [self._dmm_exe_path],
                 cwd=os.path.dirname(self._dmm_exe_path),
-                creationflags=subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP,
+                creationflags=getattr(subprocess, "DETACHED_PROCESS", 0)
+                | getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0),
             )
             self._update_connection_status()
             self.status_message.emit("DMM launched")

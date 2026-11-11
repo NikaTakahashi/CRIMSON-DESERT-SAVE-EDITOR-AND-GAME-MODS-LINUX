@@ -5,6 +5,9 @@ project(CrimsonDesertSaveEditorDesktop LANGUAGES C CXX)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
+# Static libs here are linked into the shared parc_parser backend, so objects
+# must be position independent on Linux.
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
     set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
@@ -28,10 +31,9 @@ target_include_directories(save_parser_core
         src
 )
 
-target_link_libraries(save_parser_core
-    PUBLIC
-        bcrypt
-)
+if(WIN32)
+    target_link_libraries(save_parser_core PUBLIC bcrypt)
+endif()
 
 set_target_properties(save_parser_core PROPERTIES
     INTERPROCEDURAL_OPTIMIZATION_RELEASE TRUE
@@ -84,7 +86,10 @@ add_library(save_writer STATIC
     src/save_writer.cpp
 )
 target_include_directories(save_writer PUBLIC src)
-target_link_libraries(save_writer PUBLIC bcrypt lz4_lib)
+target_link_libraries(save_writer PUBLIC lz4_lib)
+if(WIN32)
+    target_link_libraries(save_writer PUBLIC bcrypt)
+endif()
 
 # parc_dump â€” CLI save tree dumper
 add_executable(parc_dump src/parc_dump.cpp)
@@ -93,6 +98,11 @@ target_link_libraries(parc_dump PRIVATE save_parser_core)
 # PARC serializer (full reserialize from tree)
 add_library(parc_serializer STATIC src/parc_serializer.cpp)
 target_include_directories(parc_serializer PUBLIC src)
+
+# dye_cli — CLI dye rebuild helper the Python GUI uses when it is present
+add_executable(dye_cli src/dye_cli.cpp)
+target_include_directories(dye_cli PRIVATE src)
+target_link_libraries(dye_cli PRIVATE save_parser_core)
 
 # Item factory (construct items from scratch)
 add_library(item_factory STATIC src/item_factory.cpp)
@@ -124,47 +134,50 @@ if(MSVC)
     target_link_options(parc_engine_cli PRIVATE /STACK:8388608)
 endif()
 
-# Icon cache (WIC-based webp loader + DX11 texture)
-add_library(icon_cache STATIC src/icon_cache.cpp)
-target_include_directories(icon_cache PUBLIC src)
-target_link_libraries(icon_cache PUBLIC d3d11 windowscodecs)
+# Icon cache (WIC-based webp loader + DX11 texture) and the ImGui GUI need the
+# Win32 + DirectX11 imgui backends, so they are Windows-only. On Linux/macOS the
+# core libraries and the CLI tools still build.
+if(WIN32)
+    add_library(icon_cache STATIC src/icon_cache.cpp)
+    target_include_directories(icon_cache PUBLIC src)
+    target_link_libraries(icon_cache PUBLIC d3d11 windowscodecs)
 
-# ImGui inventory editor — Win32 + DirectX11
-set(IMGUI_DIR ${CMAKE_SOURCE_DIR}/third_party/imgui)
-add_executable(inventory_editor WIN32
-    src/inventory_editor.cpp
-    src/quest_editor.cpp
-    src/knowledge_editor.cpp
-    src/dye_editor.cpp
-    src/world_editor.cpp
-    src/appearance_editor.cpp
-    src/editor_common.cpp
-    src/save_repair.cpp
-    src/transplant_editor.cpp
-    ${IMGUI_DIR}/imgui.cpp
-    ${IMGUI_DIR}/imgui_draw.cpp
-    ${IMGUI_DIR}/imgui_tables.cpp
-    ${IMGUI_DIR}/imgui_widgets.cpp
-    ${IMGUI_DIR}/backends/imgui_impl_win32.cpp
-    ${IMGUI_DIR}/backends/imgui_impl_dx11.cpp
-)
-target_include_directories(inventory_editor PRIVATE
-    src
-    ${IMGUI_DIR}
-    ${IMGUI_DIR}/backends
-    ${CMAKE_SOURCE_DIR}/third_party
-)
-target_link_libraries(inventory_editor PRIVATE
-    parc_engine
-    parc_xml
-    item_factory
-    icon_cache
-    d3d11
-    dxgi
-    d3dcompiler
-    comdlg32
-)
-# 8MB stack (default is 1MB — too small for deep tree walks on 183K+ nodes)
-if(MSVC)
+    set(IMGUI_DIR ${CMAKE_SOURCE_DIR}/third_party/imgui)
+    add_executable(inventory_editor WIN32
+        src/inventory_editor.cpp
+        src/quest_editor.cpp
+        src/knowledge_editor.cpp
+        src/dye_editor.cpp
+        src/world_editor.cpp
+        src/appearance_editor.cpp
+        src/editor_common.cpp
+        src/save_repair.cpp
+        src/transplant_editor.cpp
+        ${IMGUI_DIR}/imgui.cpp
+        ${IMGUI_DIR}/imgui_draw.cpp
+        ${IMGUI_DIR}/imgui_tables.cpp
+        ${IMGUI_DIR}/imgui_widgets.cpp
+        ${IMGUI_DIR}/backends/imgui_impl_win32.cpp
+        ${IMGUI_DIR}/backends/imgui_impl_dx11.cpp
+    )
+    target_include_directories(inventory_editor PRIVATE
+        src
+        ${IMGUI_DIR}
+        ${IMGUI_DIR}/backends
+        ${CMAKE_SOURCE_DIR}/third_party
+    )
+    target_link_libraries(inventory_editor PRIVATE
+        parc_engine
+        parc_xml
+        item_factory
+        icon_cache
+        d3d11
+        dxgi
+        d3dcompiler
+        comdlg32
+    )
+    # 8MB stack (default is 1MB on MSVC — too small for deep tree walks on 183K+ nodes)
     target_link_options(inventory_editor PRIVATE /STACK:8388608)
+else()
+    message(STATUS "ImGui inventory editor and icon_cache are Windows-only; skipped on ${CMAKE_SYSTEM_NAME}")
 endif()

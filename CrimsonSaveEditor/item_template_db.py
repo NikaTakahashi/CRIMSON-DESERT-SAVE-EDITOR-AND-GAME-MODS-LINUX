@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+import platform_paths
 import struct
 import sys
 import gc
@@ -326,7 +327,7 @@ def main():
     lk = sub.add_parser('lookup', help='Look up a specific item')
     lk.add_argument('item_key', type=int, help='Item key to look up')
 
-    ia = sub.add_parser('ingest-all', help='Ingest all saves from the default directory')
+    ia = sub.add_parser('ingest-all', help='Ingest all saves from the default directory (or $CD_SAVE_DIR)')
 
     args = parser.parse_args()
 
@@ -339,7 +340,13 @@ def main():
         print(f"Database: {len(db)} templates")
 
     elif args.command == 'ingest-all':
-        saves_dir = r"C:\Users\Coding\AppData\Local\Pearl Abyss\CD\save\57173764"
+        # Default save root for this platform; CD_SAVE_DIR overrides it.
+        saves_dir = os.environ.get('CD_SAVE_DIR') or (
+            platform_paths.save_root_candidates() or [os.path.expanduser("~")])[0]
+        user_dirs = [d for d in os.listdir(saves_dir)
+                     if os.path.isdir(os.path.join(saves_dir, d))] if os.path.isdir(saves_dir) else []
+        if len(user_dirs) == 1:
+            saves_dir = os.path.join(saves_dir, user_dirs[0])
         db = ingest_all_saves(saves_dir)
         print(f"Database: {len(db)} templates")
 

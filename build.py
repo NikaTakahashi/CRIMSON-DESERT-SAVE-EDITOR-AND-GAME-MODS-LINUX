@@ -125,8 +125,12 @@ def main() -> int:
             if candidate.exists():
                 cmd += ["--include-data-file", f"{candidate}=dmm_parser/{candidate.name}"]
     else:
+        native_backend_name = {
+            "win32": "parc_parser.dll",
+            "darwin": "parc_parser.dylib",
+        }.get(sys.platform, "libparc_parser.so")
         for file_name in [
-            "parc_parser.dll",
+            native_backend_name,
             "item_names.json",
             "store_names.json",
             "item_templates.json",

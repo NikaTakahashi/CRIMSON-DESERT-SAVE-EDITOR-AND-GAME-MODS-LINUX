@@ -12,6 +12,8 @@ import urllib.request
 from pathlib import Path
 from typing import Callable, Dict, List, Optional
 
+import platform_paths
+
 log = logging.getLogger(__name__)
 
 _MY_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -62,15 +64,8 @@ ENGLISH_NAMES: Dict[str, str] = {
 
 
 def _system_user_locale_dir() -> Path:
-    if sys.platform.startswith("win"):
-        base = os.environ.get("LOCALAPPDATA") or os.path.expanduser("~")
-        return Path(base) / "CrimsonSaveEditor" / "locale"
-    if sys.platform == "darwin":
-        return Path.home() / "Library" / "Application Support" / "CrimsonSaveEditor" / "locale"
-    xdg = os.environ.get("XDG_DATA_HOME")
-    if xdg:
-        return Path(xdg) / "CrimsonSaveEditor" / "locale"
-    return Path.home() / ".local" / "share" / "CrimsonSaveEditor" / "locale"
+    # Single source of truth for the per-user data dir: platform_paths.
+    return platform_paths.app_data_dir("CrimsonSaveEditor") / "locale"
 
 
 def _exe_locale_dir() -> Path:

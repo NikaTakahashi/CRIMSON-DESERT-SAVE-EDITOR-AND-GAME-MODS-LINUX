@@ -1,10 +1,7 @@
 /**
  * PARC Parser DLL — C exports for Python ctypes
  */
-#ifndef NOMINMAX
-#define NOMINMAX
-#endif
-#include <windows.h>
+#include "portable_temp.h"
 #include "save_parser_cpp.h"
 #include "parc_engine.h"
 #include "parc_serializer.h"
@@ -28,19 +25,9 @@ namespace {
 struct TempFile {
     std::string path;
 
-    TempFile() {
-        char temp_dir[MAX_PATH] = {};
-        char temp_file[MAX_PATH] = {};
-        if (!GetTempPathA(MAX_PATH, temp_dir) ||
-            !GetTempFileNameA(temp_dir, "cse", 0, temp_file)) {
-            throw std::runtime_error("Unable to allocate a temporary validation file");
-        }
-        path = temp_file;
-    }
+    TempFile() : path(PortableTemp::temp_file("cse").string()) {}
 
-    ~TempFile() {
-        if (!path.empty()) DeleteFileA(path.c_str());
-    }
+    ~TempFile() { PortableTemp::remove_file(path); }
 };
 
 std::string JsonEscape(const std::string& value) {
@@ -269,9 +256,7 @@ EXPORT int parc_parse_blob(
 ) {
     try {
         // Write blob to temp file and parse it (reuse existing file-based parser)
-        char temp_path[MAX_PATH];
-        GetTempPathA(MAX_PATH, temp_path);
-        std::string temp_file = std::string(temp_path) + "parc_dll_temp.bin";
+        std::string temp_file = PortableTemp::temp_file("parc_dll_temp").string();
 
         {
             std::ofstream ofs(temp_file, std::ios::binary);
@@ -279,7 +264,7 @@ EXPORT int parc_parse_blob(
         }
 
         auto result = SaveParserCpp::ParseRawFile(temp_file);
-        DeleteFileA(temp_file.c_str());
+        PortableTemp::remove_file(temp_file);
 
         std::string json = SaveParserCpp::ToJson(result);
         *out_size = static_cast<uint32_t>(json.size());
@@ -376,11 +361,11 @@ EXPORT int parc_write_validated_save(
         auto written = SaveParserCpp::ParseFile(output_save_path);
         auto written_validation = ValidateParsed(written, true);
         if (!written_validation.ok) {
-            DeleteFileA(output_save_path);
+            PortableTemp::remove_file(output_save_path);
             throw std::runtime_error("Written save failed post-write validation");
         }
         if (written.raw_blob != edited_blob) {
-            DeleteFileA(output_save_path);
+            PortableTemp::remove_file(output_save_path);
             throw std::runtime_error("Written save payload does not match the validated edited data");
         }
 

@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import platform_paths
 import sys
 from typing import Callable, Optional
 
@@ -21,6 +22,7 @@ _LOCAL_DB = os.path.join(_EXTERNAL_DIR, "item_templates.json")
 
 _SAVE_DIRS = [
     os.path.expandvars(r"%LOCALAPPDATA%\Pearl Abyss\CD\save"),
+    *platform_paths.save_root_candidates(),
 ]
 
 
