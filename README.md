@@ -1,7 +1,7 @@
 # Crimson Desert — Save Editor & Game Mods · **Linux fork**
 
 > **This repository is a fork, not the official project.** It is not maintained by the original
-> author and publishes no official releases.
+> author; the builds it publishes are fork builds, not upstream ones (see [Downloads](#downloads-fork-builds)).
 >
 > Upstream (original): [NattKh/CRIMSON-DESERT-SAVE-EDITOR-AND-GAME-MODS](https://github.com/NattKh/CRIMSON-DESERT-SAVE-EDITOR-AND-GAME-MODS)
 > — created and maintained by **Rice (RicePaddySoftware / NattKh)**.
@@ -52,6 +52,23 @@ Verified on an x86-64 Fedora system (Python 3.15, PySide6 6.8, PyInstaller 6.22)
 real `save.save`, so parsing a genuine save, PAZ patching and cross-checking against the game were not
 exercised. The round-trip above proves internal consistency, not compatibility with the game. If a real
 save breaks something, that is the first place to test this fork.
+
+## Downloads (fork builds)
+
+| Tool | Release | Assets |
+|---|---|---|
+| Save Editor | [standalone-v1.0.7](https://github.com/NikaTakahashi/CRIMSON-DESERT-SAVE-EDITOR-AND-GAME-MODS-LINUX/releases/tag/standalone-v1.0.7) | `.AppImage`, `.tar.gz`, Windows `.exe` |
+| Game Mods | [gamemods-v2.1.7](https://github.com/NikaTakahashi/CRIMSON-DESERT-SAVE-EDITOR-AND-GAME-MODS-LINUX/releases/tag/gamemods-v2.1.7) | `.AppImage`, `.tar.gz`, Windows `.exe` |
+
+- **AppImage** — self-contained, nothing to install: `chmod +x` and run it. It carries its own runtime;
+  the squashfs payload is mounted read-only, so runtime data goes to the per-user data dir.
+- **tar.gz** — the plain PyInstaller output plus the native modules (`libparc_parser.so`,
+  `dmm_parser.abi3.so`, `dye_cli`). Extract and run the binary. Built against glibc 2.44, so an older
+  distribution may refuse to start it.
+- **`.exe`** — the Windows build produced by the CI workflow, kept for parity with upstream.
+
+Tag names follow the upstream scheme (`standalone-vX.Y.Z`, `gamemods-vX.Y.Z`), so the release titles say
+*Linux fork*. Both need a desktop session for Qt.
 
 ## Quick start (Linux)
 
