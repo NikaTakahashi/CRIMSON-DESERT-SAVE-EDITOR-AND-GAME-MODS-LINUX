@@ -28,18 +28,36 @@ Or use `build.bat` inside `CrimsonGameMods/` — it clears caches and runs PyIns
 ## Linux / SteamOS
 
 ```bash
-sudo apt install python3 python3-pip git   # Debian/Ubuntu/SteamOS
-pip install PySide6 lz4 cryptography Pillow pyinstaller
+python3 -m venv .venv && .venv/bin/pip install PySide6 lz4 cryptography Pillow pyinstaller
 
-git clone https://github.com/NattKh/CRIMSON-DESERT-SAVE-EDITOR-AND-GAME-MODS.git
-cd CRIMSON-DESERT-SAVE-EDITOR-AND-GAME-MODS/CrimsonGameMods
+# Native C++ backend for the Save Editor. The ctypes wrapper looks for
+# libparc_parser.so next to native_backend.py, so build it and put it there.
+cmake -S CrimsonSaveEditorCpp -B CrimsonSaveEditorCpp/build
+cmake --build CrimsonSaveEditorCpp
+cp CrimsonSaveEditorCpp/build/libparc_parser.so CrimsonSaveEditor/
 
-python -m PyInstaller CrimsonGameMods.spec --noconfirm
+# Run straight from source
+python3 CrimsonSaveEditor/main.py
+
+# Or package it — the same specs already pick the per-platform binaries
+python3 build.py --project saveeditor
+# Output: CrimsonSaveEditor/dist/CrimsonSaveEditorStandalone
 ```
+
+Crimson Desert has no Linux build, so game and save paths resolve through the Steam
+prefix (`$XDG_DATA_HOME/Steam`, `~/.local/share/Steam`, the flatpak Steam data dir) and,
+for a Proton install, through `steamapps/compatdata/3321460/pfx/drive_c/...`. That is the
+only place the tools look on Linux; there is no drive-letter logic.
+
+`pip install lz4` compiles from source on Python versions without a wheel, which needs a C
+compiler plus the Python dev headers (`python3-dev`). Without `lz4` the Save Editor cannot
+open a save file, so this dependency is not optional.
 
 ## Note on native extensions
 
-The tools use `dmm_parser` (Rust-based parser). Pre-built `.pyd` (Windows) and `.abi3.so` (Linux) binaries ship with the repo in `CrimsonGameMods/dmm_parser/`. You do not need Rust installed to build.
+The tools use `dmm_parser` (Rust-based parser). Pre-built `.pyd` (Windows) and `.abi3.so` (Linux) binaries ship with the repo in `CrimsonGameMods/dmm_parser/`. You do not need Rust installed to build. On Linux the shipped `.abi3.so` is loaded through `importlib.machinery.ExtensionFileLoader`, because that filename is not importable as the `dmm_parser.dmm_parser` submodule.
+
+`crimson_rs` is a pure-Python package; its optional native bindings come from `dmm_parser` (`.abi3.so` on Linux, `.pyd` on Windows), so the Linux `.abi3.so` loader fix above is what makes those functions available. Without them the pure-Python path is used and nothing fails. The Save Editor's `libparc_parser.so` is not shipped; build it with CMake as shown above.
 
 ## Troubleshooting
 
