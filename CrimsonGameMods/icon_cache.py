@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import os
+import platform_paths
 import sys
 import threading
 from typing import Callable, Dict, Optional
@@ -18,11 +19,8 @@ _GITHUB_ICON_BASE = "https://raw.githubusercontent.com/NattKh/CRIMSON-DESERT-SAV
 
 
 def _get_local_icons_dir():
-    if getattr(sys, 'frozen', False):
-        base = os.path.dirname(os.path.abspath(sys.executable))
-    else:
-        base = os.path.dirname(os.path.abspath(__file__))
-    return os.path.join(base, "icons_local")
+    # Cached icons are written here; an AppImage mount is read-only.
+    return str(platform_paths.writable_dir("icons_local"))
 
 
 class IconCache:

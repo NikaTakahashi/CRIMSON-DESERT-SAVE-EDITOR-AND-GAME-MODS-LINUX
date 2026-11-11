@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import os
+import platform_paths
 import sys
 from typing import Callable, Dict, Optional
 
@@ -13,11 +14,8 @@ log = logging.getLogger(__name__)
 ICON_SIZE = 32
 
 def _get_local_icons_dir():
-    if getattr(sys, 'frozen', False):
-        base = os.path.dirname(os.path.abspath(sys.executable))
-    else:
-        base = os.path.dirname(os.path.abspath(__file__))
-    return os.path.join(base, "icons_local")
+    # Cached icons are written here; an AppImage mount is read-only.
+    return str(platform_paths.writable_dir("icons_local"))
 
 
 class IconCache:

@@ -31035,16 +31035,18 @@ QCheckBox::indicator {{
 
     @staticmethod
     def _app_dir() -> str:
-        if getattr(sys, 'frozen', False):
-            return os.path.dirname(sys.executable)
-        return os.path.dirname(os.path.abspath(__file__))
+        # Read-only layouts (e.g. an AppImage) resolve to the per-user data dir.
+        return str(platform_paths.writable_dir())
 
     def _get_pack_dirs(self) -> list:
         base = self._app_dir()
         dirs = []
         for folder in ['quest_packs', 'knowledge_packs']:
             p = os.path.join(base, folder)
-            os.makedirs(p, exist_ok=True)
+            try:
+                os.makedirs(p, exist_ok=True)
+            except OSError:
+                pass
             dirs.append(p)
         return dirs
 

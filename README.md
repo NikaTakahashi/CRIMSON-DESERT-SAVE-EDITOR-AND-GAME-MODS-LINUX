@@ -110,7 +110,10 @@ Feature lists are inherited from upstream; the full breakdown is in the
 Usage:
 
 1. Run the tool (source or packaged binary).
-2. It writes config/backups next to itself — keep it in its own folder.
+2. It writes config/backups next to itself — keep it in its own folder. If that folder is read-only
+   (the AppImage mount, a squashfs image, `/opt`), it falls back to the per-user data dir:
+   `~/.local/share/CrimsonSaveEditor` / `~/.local/share/CrimsonGameMods` on Linux, `%APPDATA%` on
+   Windows, `~/Library/Application Support` on macOS.
 3. Point the Game Path bar at the install folder (Auto-Detect tries the Proton prefix first), then pick
    the save from the sidebar.
 4. The in-app **Guides** menu has per-tab walkthroughs.

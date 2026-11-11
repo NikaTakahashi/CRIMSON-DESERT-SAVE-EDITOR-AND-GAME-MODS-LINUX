@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import gzip
 import os
+import platform_paths
 import sqlite3
 import sys
 
@@ -70,7 +71,8 @@ def get_connection() -> sqlite3.Connection:
 def open_writable() -> sqlite3.Connection:
     import shutil
 
-    target = os.path.join(_exe_dir(), DB_FILENAME)
+    # Read-only layouts (AppImage): the working copy lives in the writable data dir.
+    target = str(platform_paths.writable_dir() / DB_FILENAME)
     if not os.path.isfile(target):
         path, compressed = _resolve()
         if os.path.isfile(path) and path != target:

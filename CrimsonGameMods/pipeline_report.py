@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import datetime
 import os
+import platform_paths
 import struct
 import sys
 import traceback
@@ -17,11 +18,8 @@ class PipelineReport:
 
     @staticmethod
     def _resolve_log_path(name: str) -> str:
-        if getattr(sys, 'frozen', False):
-            base = os.path.dirname(os.path.abspath(sys.executable))
-        else:
-            base = os.path.dirname(os.path.abspath(__file__))
-        return os.path.join(base, name)
+        # Read-only layouts (e.g. an AppImage) fall back to the per-user data dir.
+        return str(platform_paths.writable_dir() / name)
 
     def add(self, msg: str) -> None:
         self._lines.append(msg)

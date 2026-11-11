@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import platform_paths
 import sys
 
 from PySide6.QtCore import Qt
@@ -36,11 +37,8 @@ def _readable_color(preferred: str, background: str, fallback: str) -> str:
 
 
 def startup_config_path() -> str:
-    if getattr(sys, "frozen", False):
-        base = os.path.dirname(os.path.abspath(sys.executable))
-    else:
-        base = os.path.dirname(os.path.abspath(__file__))
-    return os.path.join(base, "editor_config.json")
+    # Read-only layouts (e.g. an AppImage) keep the config in the per-user data dir.
+    return str(platform_paths.writable_dir() / "editor_config.json")
 
 
 def load_startup_settings(config_path: str | None = None) -> tuple[str, dict]:

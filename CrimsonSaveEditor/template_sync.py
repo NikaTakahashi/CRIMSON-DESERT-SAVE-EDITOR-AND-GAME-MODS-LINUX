@@ -10,11 +10,8 @@ from typing import Callable, Optional
 log = logging.getLogger(__name__)
 
 _SOURCE_DIR = os.path.dirname(os.path.abspath(__file__))
-_EXTERNAL_DIR = (
-    os.path.dirname(os.path.abspath(sys.executable))
-    if getattr(sys, "frozen", False)
-    else _SOURCE_DIR
-)
+# Written-to folder: an AppImage mount is read-only, so fall back to the per-user data dir.
+_EXTERNAL_DIR = str(platform_paths.writable_dir())
 _BUNDLE_DIR = getattr(sys, "_MEIPASS", _SOURCE_DIR)
 _LOCAL_MASTER = os.path.join(_EXTERNAL_DIR, "master_templates.json")
 _BUNDLED_MASTER = os.path.join(_BUNDLE_DIR, "master_templates.json")

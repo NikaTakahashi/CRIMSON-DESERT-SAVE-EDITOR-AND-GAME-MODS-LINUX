@@ -9,11 +9,8 @@ import gc
 log = logging.getLogger(__name__)
 
 _BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-_EXTERNAL_DIR = (
-    os.path.dirname(os.path.abspath(sys.executable))
-    if getattr(sys, 'frozen', False)
-    else _BASE_DIR
-)
+# Written-to folder: an AppImage mount is read-only, so fall back to the per-user data dir.
+_EXTERNAL_DIR = str(platform_paths.writable_dir())
 _BUNDLE_DIR = getattr(sys, '_MEIPASS', _BASE_DIR)
 DB_PATH = os.path.join(_EXTERNAL_DIR, 'item_templates.json')
 MASTER_PATH = os.path.join(_EXTERNAL_DIR, 'master_templates.json')

@@ -1,5 +1,6 @@
 import sys
 import os
+import platform_paths
 
 
 def _splash(text: str) -> None:
@@ -38,8 +39,8 @@ _splash("Starting up...")
 
 def _setup_file_logging() -> None:
     try:
-        base = os.path.dirname(sys.executable) if getattr(sys, "frozen", False) \
-               else os.path.dirname(os.path.abspath(__file__))
+        # Read-only layouts (e.g. an AppImage) fall back to the per-user data dir.
+        base = str(platform_paths.writable_dir())
         log_path = os.path.join(base, "logs.txt")
         log_file = open(log_path, "a", buffering=1, encoding="utf-8", errors="replace")
 
@@ -106,11 +107,7 @@ _CJK_FONT_STACK = [
 
 
 def _editor_config_path() -> str:
-    base = (
-        os.path.dirname(os.path.abspath(sys.executable))
-        if getattr(sys, "frozen", False)
-        else os.path.dirname(os.path.abspath(__file__))
-    )
+    base = str(platform_paths.writable_dir())
     primary = os.path.join(base, "editor_config.json")
     gui_alt = os.path.join(base, "gui", "editor_config.json")
     if not os.path.isfile(primary) and os.path.isfile(gui_alt):
