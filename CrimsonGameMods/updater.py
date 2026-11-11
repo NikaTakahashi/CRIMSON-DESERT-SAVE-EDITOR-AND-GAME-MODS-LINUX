@@ -91,6 +91,12 @@ def download_update(url: str, progress_callback=None) -> Optional[str]:
             current_exe = os.path.abspath(sys.argv[0])
 
         exe_dir = os.path.dirname(current_exe)
+        if not os.access(exe_dir, os.W_OK):
+            # Read-only layouts (e.g. an AppImage mount) cannot host the update;
+            # keep it in the per-user data dir so the download still succeeds.
+            exe_dir = str(platform_paths.writable_dir())
+            os.makedirs(exe_dir, exist_ok=True)
+            log.warning("Run folder is read-only; saving update to %s", exe_dir)
         is_zip = url.lower().endswith(".zip")
         download_path = os.path.join(
             exe_dir,
@@ -180,6 +186,14 @@ def apply_update_and_restart(update_path: str) -> None:
     exe_dir = os.path.dirname(current_exe)
     current_name = os.path.basename(current_exe)
     update_name = os.path.basename(update_path)
+
+    if not os.access(exe_dir, os.W_OK):
+        log.warning(
+            "Run folder is read-only, so the binary cannot be replaced in place; "
+            "copy %s over %s and restart.", update_path,
+            os.path.join(exe_dir, current_name),
+        )
+        return
 
     current_full = os.path.join(exe_dir, current_name)
     update_full = os.path.join(exe_dir, update_name)
