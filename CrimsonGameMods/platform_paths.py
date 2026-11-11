@@ -55,11 +55,16 @@ def writable_dir(subdir: str = "", app_name: str = APP_NAME) -> Path:
 
     Writing next to the executable is the documented behaviour, but read-only
     layouts -- an AppImage, a system-wide install -- make that folder
-    uncreatable, so fall back to the per-user data directory.
+    uncreatable, so fall back to the per-user data directory. mkdir with
+    exist_ok reports success on a read-only mount, so prove the folder by
+    actually writing to it.
     """
     target = run_dir(subdir)
     try:
         target.mkdir(parents=True, exist_ok=True)
+        probe = target / ".write_probe"
+        probe.touch()
+        probe.unlink()
         return target
     except OSError:
         fallback = app_data_dir(app_name) / subdir
