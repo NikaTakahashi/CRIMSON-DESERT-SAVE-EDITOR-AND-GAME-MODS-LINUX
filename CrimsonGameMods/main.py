@@ -246,11 +246,7 @@ def main() -> None:
     if harvest_i18n:
         try:
             from gui_i18n import dump_harvest
-            out = os.path.join(
-                os.path.dirname(sys.executable) if getattr(sys, "frozen", False)
-                else os.path.dirname(os.path.abspath(__file__)),
-                "harvest_missing.json",
-            )
+            out = os.path.join(str(platform_paths.writable_dir()), "harvest_missing.json")
             dump_harvest(out)
             print(f"[gui_i18n] wrote harvest -> {out}")
         except Exception as e:

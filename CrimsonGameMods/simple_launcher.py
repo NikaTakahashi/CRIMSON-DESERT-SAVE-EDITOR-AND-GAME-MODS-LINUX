@@ -53,9 +53,9 @@ QScrollArea {{ border: none; }}
 VANILLA_GROUPS = set(f"{g:04d}" for g in range(36))
 INTERNAL = "gamedata/binary__/client/bin"
 
-CONFIG_PATH = os.path.join(
-    os.path.dirname(os.path.abspath(sys.executable if getattr(sys, 'frozen', False) else __file__)),
-    "simple_launcher_config.json")
+# Config lives in the app's own folder beside the program (the AppImage file),
+# falling back to the per-user data dir when that folder is read-only.
+CONFIG_PATH = os.path.join(str(platform_paths.writable_dir()), "simple_launcher_config.json")
 
 
 # ─── Mod Definitions ─────────────────────────────────────────────────

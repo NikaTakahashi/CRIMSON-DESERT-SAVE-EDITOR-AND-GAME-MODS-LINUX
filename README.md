@@ -62,18 +62,21 @@ so the round-trip proof still shows internal consistency, not compatibility with
 
 | Tool | Release | Assets |
 |---|---|---|
-| Save Editor | [standalone-v1.0.8](https://github.com/NikaTakahashi/CRIMSON-DESERT-SAVE-EDITOR-AND-GAME-MODS-LINUX/releases/tag/standalone-v1.0.8) | `.AppImage`, `.tar.gz`, Windows `.exe` |
-| Game Mods | [gamemods-v2.1.8](https://github.com/NikaTakahashi/CRIMSON-DESERT-SAVE-EDITOR-AND-GAME-MODS-LINUX/releases/tag/gamemods-v2.1.8) | `.AppImage`, `.tar.gz`, Windows `.exe` |
+| Save Editor | [standalone-v1.0.9](https://github.com/NikaTakahashi/CRIMSON-DESERT-SAVE-EDITOR-AND-GAME-MODS-LINUX/releases/tag/standalone-v1.0.9) | `.AppImage`, `.tar.gz`, Windows `.exe` |
+| Game Mods | [gamemods-v2.1.9](https://github.com/NikaTakahashi/CRIMSON-DESERT-SAVE-EDITOR-AND-GAME-MODS-LINUX/releases/tag/gamemods-v2.1.9) | `.AppImage`, `.tar.gz`, Windows `.exe` |
 
-- **AppImage** — self-contained, nothing to install: `chmod +x` and run it. It carries its own runtime;
-  the squashfs payload is mounted read-only, so runtime data goes to the per-user data dir.
+- **AppImage** — self-contained, nothing to install: `chmod +x` and run it. It carries its own runtime.
+  The squashfs payload is mounted read-only, but the app creates its own folder **beside the `.AppImage`
+  file** and writes config, the icon cache, the JSON databases and logs there; only if that folder cannot
+  be created does it fall back to the per-user data dir.
 - **tar.gz** — the plain PyInstaller output plus the native modules (`libparc_parser.so`,
   `dmm_parser.abi3.so`, `dye_cli`). Extract and run the binary. Built against glibc 2.44, so an older
   distribution may refuse to start it.
 - **`.exe`** — the Windows build produced by the CI workflow, kept for parity with upstream.
-- The v1.0.8 **AppImage** was assembled with `squashfs-tools` (`appimagetool` is not packaged for Fedora):
-  the v1.0.7 runtime and its offset table were kept, the gzip squashfs payload rebuilt with the new binary,
-  `dye_cli` and `libparc_parser.so`. `--appimage-extract` returns exactly the packaged build.
+- The **AppImages** were assembled with `squashfs-tools` (`appimagetool` is not packaged for Fedora): the
+  runtime and its offset table from the earlier builds are kept, the gzip squashfs payload rebuilt with the
+  new binaries plus `dye_cli` and `libparc_parser.so` / `dmm_parser.abi3.so`. `--appimage-extract` returns
+  exactly the packaged build.
 
 Tag names follow the upstream scheme (`standalone-vX.Y.Z`, `gamemods-vX.Y.Z`), so the release titles say
 *Linux fork*. Both need a desktop session for Qt.
@@ -135,8 +138,10 @@ Feature lists are inherited from upstream; the full breakdown is in the
 Usage:
 
 1. Run the tool (source or packaged binary).
-2. It writes config/backups next to itself — keep it in its own folder. If that folder is read-only
-   (the AppImage mount, a squashfs image, `/opt`), it falls back to the per-user data dir:
+2. A packaged build creates its own folder next to the program (named after the app) and writes
+   config, the icon cache, the JSON databases and logs there — for an AppImage that folder is beside the
+   `.AppImage` file itself, not inside its read-only mount. If the program folder cannot be created
+   (a system-wide install, `/opt`, read-only media), it falls back to the per-user data dir:
    `~/.local/share/CrimsonSaveEditor` / `~/.local/share/CrimsonGameMods` on Linux, `%APPDATA%` on
    Windows, `~/Library/Application Support` on macOS.
 3. Point the Game Path bar at the install folder (Auto-Detect tries the Proton prefix first), then pick

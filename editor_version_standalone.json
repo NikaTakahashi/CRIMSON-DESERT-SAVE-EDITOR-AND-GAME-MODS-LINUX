@@ -1,5 +1,5 @@
 {
-  "version": "1.0.8",
-  "url": "https://github.com/NikaTakahashi/CRIMSON-DESERT-SAVE-EDITOR-AND-GAME-MODS-LINUX/releases/download/standalone-v1.0.8/CrimsonSaveEditorStandalone.exe",
-  "notes": "CrimsonSaveEditor v1.0.8 (fork build) - pure-Python 2.04 item readers as fallback, item DB rebuilt from the install (7080 entries), bag map filled to 7085 keys, dmm_parser bundled in the packaged editor"
+  "version": "1.0.9",
+  "url": "https://github.com/NikaTakahashi/CRIMSON-DESERT-SAVE-EDITOR-AND-GAME-MODS-LINUX/releases/download/standalone-v1.0.9/CrimsonSaveEditorStandalone.exe",
+  "notes": "CrimsonSaveEditor v1.0.9 (fork build) - the app now creates its own folder beside the program (the .AppImage file itself when run through the AppImage runtime) and writes config, locale packs, the icon cache and logs there; read-only layouts still fall back to the per-user data dir"
 }

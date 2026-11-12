@@ -9,7 +9,9 @@ from typing import Dict, List, Optional
 from models import ItemInfo
 
 import sys as _sys
-_exe_dir = os.path.dirname(os.path.abspath(_sys.executable)) if getattr(_sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
+# The app's own folder beside the program: the refreshed database is written here,
+# so it survives the next launch even when the payload mount is read-only.
+_exe_dir = str(platform_paths.writable_dir())
 _bundle_dir = getattr(_sys, '_MEIPASS', os.path.dirname(os.path.abspath(__file__)))
 
 SEARCH_PATHS = [
@@ -115,6 +117,11 @@ class ItemNameDB:
         path = path or self.loaded_path
         if not path:
             return
+        meipass = getattr(_sys, "_MEIPASS", None)
+        if meipass and os.path.abspath(path).startswith(os.path.abspath(meipass) + os.sep):
+            # A load from the read-only payload would otherwise save into the
+            # AppImage's temporary extraction dir; keep the JSON in the app folder.
+            path = os.path.join(_exe_dir, "item_names.json")
 
         items_list = []
         for key in sorted(self.items.keys()):

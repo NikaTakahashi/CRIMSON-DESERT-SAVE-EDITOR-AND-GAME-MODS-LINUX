@@ -1,5 +1,5 @@
 {
-  "version": "2.1.8",
-  "url": "https://github.com/NikaTakahashi/CRIMSON-DESERT-SAVE-EDITOR-AND-GAME-MODS-LINUX/releases/download/gamemods-v2.1.8/CrimsonGameMods.exe",
-  "notes": "Crimson Game Mods v2.1.8 (fork build) - pure-Python pack crypto, paloc string-table reader, 2.04 pack-index/ItemInfo readers, item DB refresh tool"
+  "version": "2.1.9",
+  "url": "https://github.com/NikaTakahashi/CRIMSON-DESERT-SAVE-EDITOR-AND-GAME-MODS-LINUX/releases/download/gamemods-v2.1.9/CrimsonGameMods.exe",
+  "notes": "Crimson Game Mods v2.1.9 (fork build) - the app now creates its own folder beside the program (the .AppImage file itself when run through the AppImage runtime) and writes config, locale packs, the icon cache and logs there; read-only layouts still fall back to the per-user data dir"
 }

@@ -13,11 +13,8 @@ _connection: sqlite3.Connection | None = None
 
 
 def _exe_dir() -> str:
-    return (
-        os.path.dirname(os.path.abspath(sys.executable))
-        if getattr(sys, "frozen", False)
-        else os.path.dirname(os.path.abspath(__file__))
-    )
+    """The app's own folder (beside the program), else the package folder."""
+    return str(platform_paths.writable_dir())
 
 
 def _resolve() -> tuple[str, bool]:

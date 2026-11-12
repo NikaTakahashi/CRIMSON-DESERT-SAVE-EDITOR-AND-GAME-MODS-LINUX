@@ -11,9 +11,10 @@ import traceback
 
 
 def _application_dir() -> str:
-    if getattr(sys, "frozen", False):
-        return os.path.dirname(os.path.abspath(sys.executable))
-    return os.path.dirname(os.path.abspath(__file__))
+    """The app's own folder, created on demand: beside the program (the AppImage
+    file itself when run through the AppImage runtime), else the per-user data dir.
+    """
+    return str(platform_paths.writable_dir())
 
 
 def _open_log_stream() -> tuple[str, object]:

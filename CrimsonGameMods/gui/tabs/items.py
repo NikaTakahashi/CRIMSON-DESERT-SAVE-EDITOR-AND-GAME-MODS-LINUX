@@ -360,7 +360,7 @@ class DatabaseBrowserTab(QWidget):
         if not items:
             return
 
-        packs_dir = os.path.join(os.path.dirname(os.path.abspath(_sys.argv[0])), "dropset_packs")
+        packs_dir = str(platform_paths.writable_dir("dropset_packs"))
         os.makedirs(packs_dir, exist_ok=True)
         default_fn = name.strip().replace(" ", "_") + ".json"
 

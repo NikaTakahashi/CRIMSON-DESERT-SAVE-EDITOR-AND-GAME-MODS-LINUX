@@ -41,21 +41,43 @@ def app_data_dir(app_name: str = APP_NAME) -> Path:
     return base / app_name
 
 
-def run_dir(subdir: str = "") -> Path:
-    """Folder the program itself lives in (bundled data such as icon caches)."""
+def program_dir() -> Path:
+    """The folder the user actually launched the app from.
+
+    A PyInstaller one-file binary inside an AppImage runs from its temporary
+    extraction directory, so `sys.executable` is not a durable home for runtime
+    data: whatever is written there disappears when the app exits. The AppImage
+    runtime exports APPIMAGE with the path of the .AppImage file itself, so that
+    folder is the stable "beside the program" location.
+    """
+    appimage = os.environ.get("APPIMAGE")
+    if appimage:
+        return Path(os.path.dirname(os.path.abspath(appimage)))
     if getattr(sys, "frozen", False):
-        base = Path(os.path.dirname(os.path.abspath(sys.executable)))
-    else:
-        base = Path(os.path.dirname(os.path.abspath(__file__)))
+        return Path(os.path.dirname(os.path.abspath(sys.executable)))
+    return Path(os.path.dirname(os.path.abspath(__file__)))
+
+
+def run_dir(subdir: str = "", app_name: str = APP_NAME) -> Path:
+    """The app's own folder: beside the program, named after the app.
+
+    A packaged build gets `<program folder>/<app name>` -- next to the AppImage
+    or next to the one-file binary -- and that is where config, the icon cache,
+    the JSON databases and logs live. A source checkout keeps writing in its own
+    package folder.
+    """
+    base = program_dir()
+    if getattr(sys, "frozen", False):
+        base = base / app_name
     return base / subdir if subdir else base
 
 
 def writable_dir(subdir: str = "", app_name: str = APP_NAME) -> Path:
-    """Where runtime data (config, packs, sets) is written.
+    """Where runtime data (config, packs, sets, icons, JSONs) is written: the
+    app's own folder beside the program.
 
-    Writing next to the executable is the documented behaviour, but read-only
-    layouts -- an AppImage, a system-wide install -- make that folder
-    uncreatable, so fall back to the per-user data directory. mkdir with
+    Read-only layouts -- an AppImage mount, a system-wide install -- make that
+    folder uncreatable, so fall back to the per-user data directory. mkdir with
     exist_ok reports success on a read-only mount, so prove the folder by
     actually writing to it.
     """

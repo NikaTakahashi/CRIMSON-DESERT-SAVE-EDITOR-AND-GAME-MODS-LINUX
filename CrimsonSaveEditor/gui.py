@@ -15891,12 +15891,8 @@ QCheckBox::indicator {{
         self._paz_populate_table()
 
     def _get_export_dir(self) -> str:
-        import sys as _sys
-        if getattr(_sys, 'frozen', False):
-            base = os.path.dirname(os.path.abspath(_sys.executable))
-        else:
-            base = os.path.dirname(os.path.abspath(__file__))
-        export_dir = os.path.join(base, "Exports")
+        # Exports belong in the app's own folder beside the program.
+        export_dir = str(platform_paths.writable_dir("Exports"))
         os.makedirs(export_dir, exist_ok=True)
         return export_dir
 

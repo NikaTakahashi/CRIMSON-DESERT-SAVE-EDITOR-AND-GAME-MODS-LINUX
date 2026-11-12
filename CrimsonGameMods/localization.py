@@ -3,6 +3,8 @@ import json
 import os
 import sys
 
+import platform_paths
+
 _MY_DIR = os.path.dirname(os.path.abspath(__file__))
 _translations: dict[str, str] = {}
 _fallback: dict[str, str] = {}
@@ -12,6 +14,8 @@ _names_data: dict = {}
 
 def _get_locale_dir() -> str:
     for base in [
+        # Packs the app itself wrote live in its folder beside the program.
+        str(platform_paths.writable_dir('locale')),
         os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else _MY_DIR,
         getattr(sys, '_MEIPASS', _MY_DIR),
         _MY_DIR,
@@ -35,7 +39,7 @@ def _load_lang_file(lang: str) -> dict[str, str]:
         if lang in LOCALE_MAP:
             variants.append(f"{LOCALE_MAP[lang]}.json")
 
-    search_dirs = []
+    search_dirs = [str(platform_paths.writable_dir('locale'))]
     if getattr(sys, 'frozen', False):
         search_dirs.append(os.path.join(os.path.dirname(sys.executable), 'locale'))
     search_dirs.append(os.path.join(getattr(sys, '_MEIPASS', _MY_DIR), 'locale'))
@@ -133,22 +137,24 @@ def get_available_languages() -> list[tuple[str, str]]:
         pass
     for folder in ['locale', 'language']:
         if getattr(sys, 'frozen', False):
-            d = os.path.join(os.path.dirname(sys.executable), folder)
+            bases = [str(platform_paths.writable_dir(folder)),
+                     os.path.join(os.path.dirname(sys.executable), folder)]
         else:
-            d = os.path.join(_MY_DIR, folder)
-        if not os.path.isdir(d):
-            continue
-        for fname in sorted(os.listdir(d)):
-            if fname.startswith('names_') and fname.endswith('.json'):
-                code = fname[6:-5]
-                if not any(c == code for c, _ in languages):
-                    try:
-                        with open(os.path.join(d, fname), 'r', encoding='utf-8') as f:
-                            data = json.load(f)
-                        name = data.get('_language_name', LANG_NAMES.get(code, code))
-                    except Exception:
-                        name = LANG_NAMES.get(code, code)
-                    languages.append((code, f"{name} (names only)"))
+            bases = [str(platform_paths.writable_dir(folder)), os.path.join(_MY_DIR, folder)]
+        for d in bases:
+            if not os.path.isdir(d):
+                continue
+            for fname in sorted(os.listdir(d)):
+                if fname.startswith('names_') and fname.endswith('.json'):
+                    code = fname[6:-5]
+                    if not any(c == code for c, _ in languages):
+                        try:
+                            with open(os.path.join(d, fname), 'r', encoding='utf-8') as f:
+                                data = json.load(f)
+                            name = data.get('_language_name', LANG_NAMES.get(code, code))
+                        except Exception:
+                            name = LANG_NAMES.get(code, code)
+                        languages.append((code, f"{name} (names only)"))
     if not languages:
         languages.append(('en', 'English'))
     return languages
@@ -178,6 +184,8 @@ def _load_names_data(lang: str) -> dict:
         return {}
     filename = f"names_{lang}.json"
     search_dirs = []
+    for folder in ('locale', 'language'):
+        search_dirs.append(str(platform_paths.writable_dir(folder)))
     if getattr(sys, 'frozen', False):
         exe_dir = os.path.dirname(sys.executable)
         search_dirs.append(os.path.join(exe_dir, 'locale'))

@@ -69,9 +69,8 @@ def _system_user_locale_dir() -> Path:
 
 
 def _exe_locale_dir() -> Path:
-    if getattr(sys, "frozen", False):
-        return Path(os.path.dirname(os.path.abspath(sys.executable))) / "locale"
-    return Path(_MY_DIR) / "locale"
+    # The app's own folder beside the program (the AppImage file itself).
+    return platform_paths.writable_dir("locale")
 
 
 def _meipass_locale_dir() -> Optional[Path]:
@@ -107,7 +106,7 @@ def search_dirs() -> List[Path]:
     return out
 
 
-USER_LOCALE_DIR: Path = _system_user_locale_dir()
+USER_LOCALE_DIR: Path = _exe_locale_dir()
 
 
 def local_pack_path(lang: str) -> Path:
