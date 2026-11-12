@@ -9,9 +9,16 @@ _NATIVE_BACKENDS = [
     if os.path.isfile(os.path.join(_SPEC_DIR, name))
 ]
 
+# The pure-Python 2.04 readers live in the sibling app directory. The native
+# extension cannot read the current pack index (delta LEB128 name trie) or the
+# reordered ItemInfo record, so a packaged editor needs these modules for
+# `item_db.sync_from_local_game` to work at all. The script directory is searched
+# before pathex, so `item_db`/`models` still resolve to this app's own copies.
+_GAME_MODS = os.path.normpath(os.path.join(_SPEC_DIR, '..', 'CrimsonGameMods'))
+
 a = Analysis(
     ['main.py'],
-    pathex=[],
+    pathex=[_GAME_MODS],
     binaries=[],
     datas=[
         *((name, '.') for name in _NATIVE_BACKENDS),
@@ -66,6 +73,15 @@ a = Analysis(
         'crimson_rs.create_pack',
         'crimson_rs.pack_mod',
         'crimson_rs.validate_game_dir',
+        'dmm_parser',
+        'dmm_parser.enums',
+        'dmm_parser.pack_crypto',
+        'dmm_parser.pack_index',
+        'dmm_parser.pack_mod',
+        'dmm_parser.item_record',
+        'dmm_parser.string_table',
+        'dmm_parser.tools',
+        'dmm_parser.tools.refresh_item_db',
     ],
     hookspath=[],
     hooksconfig={},

@@ -9,9 +9,15 @@ _NATIVE_BACKENDS = [
     if os.path.isfile(os.path.join(_SPEC_DIR, name))
 ]
 
+# The pure-Python 2.04 readers live in the sibling app directory; item_db falls
+# back to them when the native extension cannot read the current pack index or
+# ItemInfo record order. The script directory is searched before pathex, so this
+# app's own top-level modules still win, and nothing network-capable is pulled in.
+_GAME_MODS = os.path.normpath(os.path.join(_SPEC_DIR, '..', 'CrimsonGameMods'))
+
 a = Analysis(
     ['main.py'],
-    pathex=[],
+    pathex=[_GAME_MODS],
     binaries=[],
     datas=[
         *((name, '.') for name in _NATIVE_BACKENDS),
@@ -66,6 +72,15 @@ a = Analysis(
         'crimson_rs.create_pack',
         'crimson_rs.pack_mod',
         'crimson_rs.validate_game_dir',
+        'dmm_parser',
+        'dmm_parser.enums',
+        'dmm_parser.pack_crypto',
+        'dmm_parser.pack_index',
+        'dmm_parser.pack_mod',
+        'dmm_parser.item_record',
+        'dmm_parser.string_table',
+        'dmm_parser.tools',
+        'dmm_parser.tools.refresh_item_db',
     ],
     hookspath=[],
     hooksconfig={},

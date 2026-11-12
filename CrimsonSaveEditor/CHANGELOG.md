@@ -1,5 +1,38 @@
 # Changelog
 
+## Save Editor (Linux fork) v1.0.8 — 2.04 item data
+
+Fork build release; the save format itself is unchanged.
+
+### Item data from the current game client
+
+- `sync_from_local_game` falls back to the pure-Python readers in `dmm_parser` when
+  the native extension fails on a 2.04 install (delta-LEB128 name trie, reordered
+  `ItemInfo` record fields), so a local scan now succeeds instead of returning
+  `trie offset ... out of bounds`.
+- Bundled item database rebuilt from the install: 6236 → 7080 entries (+844). New
+  entries keep the record text, else the plain-literal string-table entry, else the
+  internal name; categories come from the app's own classifier.
+- Bag keys: rule `1` for equip rows, `2` otherwise, which reproduces all 5886
+  curated entries on this install; `item_category_map.json` gained the 1199 game
+  items it lacked (7085 entries total).
+- On the supplied save: 86 item keys were unknown before the refresh, 77 resolve
+  now; the remaining 9 are not item-table rows.
+
+### Packaging
+
+- Both editor specs add the sibling `dmm_parser` package to the search path and to
+  the hidden imports, so a packaged executable can use the pure-Python readers. The
+  script directory is searched before `pathex`, so this app's own top-level modules
+  still resolve first.
+
+### Known limits
+
+- Most display names stay internal: `item.paloc` exposes 6 plain-literal entries,
+  the rest is prefix-coded against a dictionary the game builds at pack time.
+- New items have names, categories and bag keys but no template or stack-limit
+  entries, so the custom-item creator still needs a donor template for them.
+
 ## Stand Alone Save Editor (no game mods) v2.1.0 (2.1.0) — Pre-release testing
 
 This is a testing release. Use a copied save slot and keep the original backup

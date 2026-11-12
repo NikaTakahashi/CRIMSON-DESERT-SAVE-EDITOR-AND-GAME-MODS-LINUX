@@ -62,7 +62,7 @@ so the round-trip proof still shows internal consistency, not compatibility with
 
 | Tool | Release | Assets |
 |---|---|---|
-| Save Editor | [standalone-v1.0.7](https://github.com/NikaTakahashi/CRIMSON-DESERT-SAVE-EDITOR-AND-GAME-MODS-LINUX/releases/tag/standalone-v1.0.7) | `.AppImage`, `.tar.gz`, Windows `.exe` |
+| Save Editor | [standalone-v1.0.8](https://github.com/NikaTakahashi/CRIMSON-DESERT-SAVE-EDITOR-AND-GAME-MODS-LINUX/releases/tag/standalone-v1.0.8) | `.tar.gz`, Windows `.exe` |
 | Game Mods | [gamemods-v2.1.8](https://github.com/NikaTakahashi/CRIMSON-DESERT-SAVE-EDITOR-AND-GAME-MODS-LINUX/releases/tag/gamemods-v2.1.8) | `.AppImage`, `.tar.gz`, Windows `.exe` |
 
 - **AppImage** — self-contained, nothing to install: `chmod +x` and run it. It carries its own runtime;
@@ -71,6 +71,8 @@ so the round-trip proof still shows internal consistency, not compatibility with
   `dmm_parser.abi3.so`, `dye_cli`). Extract and run the binary. Built against glibc 2.44, so an older
   distribution may refuse to start it.
 - **`.exe`** — the Windows build produced by the CI workflow, kept for parity with upstream.
+- Save Editor **v1.0.8 has no AppImage**: building one needs `appimagetool` and `mksquashfs`, neither is
+  available on this machine without root. The v1.0.7 AppImage is untouched.
 
 Tag names follow the upstream scheme (`standalone-vX.Y.Z`, `gamemods-vX.Y.Z`), so the release titles say
 *Linux fork*. Both need a desktop session for Qt.
