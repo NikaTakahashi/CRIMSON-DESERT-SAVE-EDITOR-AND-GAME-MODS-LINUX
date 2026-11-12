@@ -14,7 +14,7 @@ import platform_paths
 log = logging.getLogger(__name__)
 
 
-APP_VERSION = "2.1.7"
+APP_VERSION = "2.1.8"
 
 APP_VARIANT = "gamemods"
 

@@ -58,7 +58,7 @@ save breaks something, that is the first place to test this fork.
 | Tool | Release | Assets |
 |---|---|---|
 | Save Editor | [standalone-v1.0.7](https://github.com/NikaTakahashi/CRIMSON-DESERT-SAVE-EDITOR-AND-GAME-MODS-LINUX/releases/tag/standalone-v1.0.7) | `.AppImage`, `.tar.gz`, Windows `.exe` |
-| Game Mods | [gamemods-v2.1.7](https://github.com/NikaTakahashi/CRIMSON-DESERT-SAVE-EDITOR-AND-GAME-MODS-LINUX/releases/tag/gamemods-v2.1.7) | `.AppImage`, `.tar.gz`, Windows `.exe` |
+| Game Mods | [gamemods-v2.1.8](https://github.com/NikaTakahashi/CRIMSON-DESERT-SAVE-EDITOR-AND-GAME-MODS-LINUX/releases/tag/gamemods-v2.1.8) | `.AppImage`, `.tar.gz`, Windows `.exe` |
 
 - **AppImage** — self-contained, nothing to install: `chmod +x` and run it. It carries its own runtime;
   the squashfs payload is mounted read-only, so runtime data goes to the per-user data dir.
