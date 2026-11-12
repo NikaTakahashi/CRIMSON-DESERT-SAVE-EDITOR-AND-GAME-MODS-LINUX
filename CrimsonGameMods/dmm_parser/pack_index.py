@@ -11,8 +11,8 @@ same trie as LEB128 delta chains, so `crimson_rs.extract_file()` fails on
 current installs with `trie offset ... out of bounds`. This module reads the
 index without the native extension.
 
-Only the LZ4/zlib codecs are implemented; an entry whose crypto nibble is set
-is left to the native `Crypto` layer and raises here.
+The LZ4/zlib codecs and ChaCha20 (crypto method 3) are implemented here; ICE and
+AES entries are still left to the native `Crypto` layer and raise.
 """
 
 from __future__ import annotations
@@ -21,6 +21,8 @@ import lz4.block
 import pathlib
 import struct
 import zlib
+
+from . import pack_crypto
 
 COMP_RAW = 0
 COMP_LZ4_BLOCK = 2
@@ -61,6 +63,9 @@ def resolve_name(buf: bytes, offset: int, delta: bool) -> str:
 
 def parse_pamt(data: bytes, delta_names: bool | None = None) -> dict:
     checksum, count, _ = struct.unpack_from('<IHH', data, 0)
+    # PackMetaHeader trailing bytes: u8 unknown, then the 3-byte encrypt_info
+    # that keys every ChaCha20 entry in the group.
+    encrypt_info = data[9:12]
     pos = 12
     chunks = []
     for _ in range(count):
@@ -101,6 +106,7 @@ def parse_pamt(data: bytes, delta_names: bool | None = None) -> dict:
 
     return {
         'checksum': checksum,
+        'encrypt_info': encrypt_info,
         'chunks': chunks,
         'delta': delta,
         'dir_buf': dir_buf,
@@ -138,10 +144,12 @@ def entry_path(index: dict, position: int, entry: tuple) -> tuple[str, str]:
     return '', entry_name(index, entry)
 
 
-def decompress_chunk(game_dir: str, group: str, chunk_id: int, offset: int, size: int,
-                     compression: int, uncompressed_size: int) -> bytes:
+def read_chunk(game_dir: str, group: str, chunk_id: int, offset: int, size: int) -> bytes:
     blob = pathlib.Path(game_dir) / group / f'{chunk_id}.paz'
-    raw = blob.read_bytes()[offset:offset + size]
+    return blob.read_bytes()[offset:offset + size]
+
+
+def _decompress(raw: bytes, compression: int, uncompressed_size: int) -> bytes:
     if compression == COMP_RAW:
         return raw
     if compression == COMP_LZ4_BLOCK:
@@ -149,6 +157,12 @@ def decompress_chunk(game_dir: str, group: str, chunk_id: int, offset: int, size
     if compression == COMP_ZLIB:
         return zlib.decompress(raw)
     raise ValueError(f"unsupported compression method {compression}")
+
+
+def decompress_chunk(game_dir: str, group: str, chunk_id: int, offset: int, size: int,
+                     compression: int, uncompressed_size: int) -> bytes:
+    return _decompress(read_chunk(game_dir, group, chunk_id, offset, size),
+                       compression, uncompressed_size)
 
 
 def find_entry(index: dict, dir_path: str, file_name: str) -> tuple:
@@ -164,9 +178,12 @@ def extract(game_dir: str, group: str, dir_path: str, file_name: str,
            index: dict | None = None) -> bytes:
     index = index or read_index(game_dir, group)
     entry = find_entry(index, dir_path, file_name)
-    name, chunk_offset, chunk_size, uncompressed, chunk_id, flags, _ext = entry
+    _node, chunk_offset, chunk_size, uncompressed, chunk_id, flags, _ext = entry
     crypto = flags >> 4
-    if crypto:
+    raw = read_chunk(game_dir, group, chunk_id, chunk_offset, chunk_size)
+    if crypto == pack_crypto.CRYPTO_CHACHA20:
+        # Entries are compressed before being encrypted, so decrypt first.
+        raw = pack_crypto.decrypt_entry(raw, index['encrypt_info'], entry_name(index, entry))
+    elif crypto:
         raise ValueError(f"{dir_path}/{file_name} needs crypto method {crypto}; use the native reader")
-    return decompress_chunk(game_dir, group, chunk_id, chunk_offset, chunk_size,
-                            flags & 0xF, uncompressed)
+    return _decompress(raw, flags & 0xF, uncompressed)

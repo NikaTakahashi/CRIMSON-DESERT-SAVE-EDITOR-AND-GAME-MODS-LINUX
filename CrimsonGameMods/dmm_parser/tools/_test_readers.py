@@ -33,15 +33,21 @@ if _PYTHON_ROOT not in sys.path:
 
 from dmm_parser import pack_index  # noqa: E402
 from dmm_parser import item_record  # noqa: E402
+from dmm_parser import string_table  # noqa: E402
 from dmm_parser.tools import refresh_item_db  # noqa: E402
 
 GAME_DIR = os.environ.get("CD_GAME_DIR", r"F:\CDump")
 GROUP = "0008"
 ITEM_DIR = "gamedata/binarystaticinfo__/bin"
+STRING_GROUP = "0020"
 
 
 def have_game() -> bool:
     return os.path.isdir(os.path.join(GAME_DIR, GROUP))
+
+
+def have_strings() -> bool:
+    return os.path.isdir(os.path.join(GAME_DIR, STRING_GROUP))
 
 
 @unittest.skipUnless(have_game(), f"no game install at {GAME_DIR}")
@@ -89,6 +95,32 @@ class ItemRecordTest(unittest.TestCase):
             self.assertEqual(loc["category"], 7)
             self.assertEqual(loc["index"], (key << 32) | 0x70, f"paloc id mismatch for {key}")
 
+    def test_item_desc_index_is_the_desc_paloc_id(self):
+        for key, offset in self.rows:
+            record, _ = item_record.read_record(self.body, offset)
+            self.assertEqual(record["item_desc"]["index"], (key << 32) | 0x71,
+                             f"desc paloc id mismatch for {key}")
+
+    def test_display_name_uses_the_string_table_only_where_it_can(self):
+        # Every record's default is the decimal paloc id, so names come from the
+        # string table's plain entries or fall back to the internal name.
+        names = string_table.read_table(GAME_DIR, STRING_GROUP, refresh_item_db.ITEM_STRINGS)
+        covered = 0
+        for key, offset in self.rows:
+            record, _ = item_record.read_record(self.body, offset)
+            self.assertEqual(record["item_name"]["default"], str(record["item_name"]["index"]))
+            loc = record["item_name"]["index"]
+            if loc in names:
+                covered += 1
+                self.assertEqual(refresh_item_db.display_name(record, names), names[loc],
+                                 f"string table name ignored for {key}")
+            else:
+                self.assertEqual(refresh_item_db.display_name(record, names), record["string_key"],
+                                 f"unexpected localized text for {key}")
+        self.assertGreater(covered, 0, "no plain entry reached the display name")
+        self.assertLess(covered, len(self.rows),
+                        "coverage must stay partial while the dictionary codec is undecoded")
+
     def test_arrow_row_decodes_to_known_values(self):
         record, consumed = item_record.read_record(self.body, self.rows[0][1])
         self.assertEqual(record["key"], 2200)
@@ -97,12 +129,80 @@ class ItemRecordTest(unittest.TestCase):
         self.assertEqual(consumed - self.rows[0][1], self.rows[1][1] - self.rows[0][1])
 
 
+def _plain_blob(entries, output_size=None):
+    """A paloc blob: header, zero block, then plain entries at the stream start."""
+    blob = bytearray(b'paloc\x00' + b'\0' * (string_table.STREAM_OFFSET - 6))
+    for key, value in entries:
+        blob += struct.pack('<I', len(key)) + key.encode() + struct.pack('<I', len(value)) + value.encode()
+    stream = len(blob) - string_table.STREAM_OFFSET
+    blob[9:13] = struct.pack('<I', stream)
+    blob[13:17] = struct.pack('<I', output_size if output_size is not None else stream)
+    return bytes(blob)
+
+
+class StringTableFormatTest(unittest.TestCase):
+
+    def test_header_reports_the_stored_stream_and_the_expanded_size(self):
+        blob = _plain_blob([('4294967408', 'Copper')], output_size=1620928)
+        self.assertEqual(string_table.parse_header(blob), {
+            'stream_size': len(blob) - string_table.STREAM_OFFSET,
+            'output_size': 1620928,
+        })
+
+    def test_plain_entry_round_trips(self):
+        blob = _plain_blob([('9448928051312', 'Stub Arrow')])
+        self.assertEqual(list(string_table.iter_plain_entries(blob)),
+                         [{'key': 9448928051312, 'value': 'Stub Arrow'}])
+
+    def test_entries_inside_the_zero_block_are_not_read(self):
+        pair = struct.pack('<I', 10) + b'4294967408' + struct.pack('<I', 6) + b'Copper'
+        blob = bytearray(_plain_blob([]))
+        blob[200:200 + len(pair)] = pair
+        self.assertEqual(list(string_table.iter_plain_entries(bytes(blob))), [])
+
+    def test_dictionary_coded_values_are_skipped(self):
+        entry = struct.pack('<I', 13) + b'9448928051312' + struct.pack('<I', 4) + b'\x80\x00\x04\x1c'
+        blob = bytearray(_plain_blob([]))
+        blob[string_table.STREAM_OFFSET:] = entry
+        self.assertEqual(list(string_table.iter_plain_entries(bytes(blob))), [])
+
+
+@unittest.skipUnless(have_strings(), f"no string table group at {GAME_DIR}/{STRING_GROUP}")
+class StringTableGameTest(unittest.TestCase):
+
+    def test_known_plain_entries_match_the_reference_dump(self):
+        names = string_table.read_table(GAME_DIR, STRING_GROUP, refresh_item_db.ITEM_STRINGS)
+        self.assertEqual(names.get((1 << 32) | 0x70), "Copper")
+        self.assertEqual(names.get((2200 << 32) | 0x70), "Stub Arrow")
+
+    def test_stored_stream_is_smaller_than_the_expanded_size(self):
+        index = pack_index.read_index(GAME_DIR, STRING_GROUP)
+        blob = pack_index.extract(GAME_DIR, STRING_GROUP, string_table.STRING_DIR,
+                                  refresh_item_db.ITEM_STRINGS, index)
+        header = string_table.parse_header(blob)
+        self.assertEqual(header['stream_size'], len(blob) - string_table.STREAM_OFFSET)
+        self.assertGreater(header['output_size'], header['stream_size'])
+
+
 class DisplayNameTest(unittest.TestCase):
+
+    def test_string_table_name_is_used_when_the_record_has_no_text(self):
+        record = {"item_name": {"category": 7, "index": 9448928051312, "default": "9448928051312"},
+                  "string_key": "Pyeonjeon_Arrow"}
+        self.assertEqual(refresh_item_db.display_name(record, {9448928051312: "Stub Arrow"}), "Stub Arrow")
+
+    def test_missing_string_table_entry_falls_back_to_the_internal_name(self):
+        record = {"item_name": {"category": 7, "index": 123, "default": "123"},
+                  "string_key": "Small_Fire_Bomb"}
+        self.assertEqual(refresh_item_db.display_name(record, {9448928051312: "Stub Arrow"}),
+                         "Small_Fire_Bomb")
 
     def test_localized_default_is_used_when_present(self):
         record = {"item_name": {"category": 7, "index": 123, "default": "Stub Arrow"},
                   "string_key": "Pyeonjeon_Arrow"}
         self.assertEqual(refresh_item_db.display_name(record), "Stub Arrow")
+        self.assertEqual(refresh_item_db.display_name(record, {123: "From The String Table"}),
+                         "Stub Arrow", "the string table must not override record text")
 
     def test_numeric_default_falls_back_to_internal_name(self):
         record = {"item_name": {"category": 7, "index": 123, "default": "123"},

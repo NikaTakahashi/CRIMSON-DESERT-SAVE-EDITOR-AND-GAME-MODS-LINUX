@@ -9,9 +9,19 @@ mapping, so items added after the mapping was captured are covered.
 The item table is read with the 2.04 readers in `dmm_parser.pack_index` /
 `dmm_parser.item_record` (the packaged native extension cannot read current
 game data). Existing entries keep their display name and category; entries the
-game has but the DB does not are added with the internal name, because the
-display name lives in the `.paloc` string tables, which are ChaCha20-encrypted
-and only readable through the native crypto layer.
+game has but the DB does not are added with the display name when the string
+table can supply one, otherwise with the internal name.
+
+Display names live in the `.paloc` string tables. The ChaCha20 layer is handled
+in pure Python (`dmm_parser.pack_crypto`), and `dmm_parser.string_table` reads
+the entries stored as plain literals - 6 on `item.paloc`, cross-checked against
+an independent dump of that table. The rest of the entry stream is prefix-coded
+against a string dictionary the game builds at pack time and does not ship in
+the table, so the native `parse_paloc_bytes` fails ("not enough data") on current
+data and most names stay internal. On current game data every record's
+`item_name.default` is the decimal paloc id `(key << 32) | 0x70`, not localized
+text, so a name only appears when the record itself carries text or the string
+table has the entry.
 
 Usage:
     python -m dmm_parser.tools.refresh_item_db <game_dir>              # report only
@@ -26,6 +36,7 @@ import json
 import os
 import sys
 
+from .. import string_table
 from ..item_record import check_boundaries, read_header, read_record
 from ..pack_index import extract, read_index
 
@@ -37,15 +48,21 @@ ITEM_GROUP = '0008'
 ITEM_DIR = 'gamedata/binarystaticinfo__/bin'
 BODY = 'iteminfo.staticinfobody'
 HEADER = 'iteminfo.staticinfoheader'
+STRING_GROUP = '0020'
+ITEM_STRINGS = 'item.paloc'
 
 DEFAULT_DB = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), 'data', 'item_names.json')
 
 
-def display_name(record: dict) -> str:
-    """Localized default when the record carries real text, else the internal name."""
+def display_name(record: dict, names: dict[int, str] | None = None) -> str:
+    """Localized default, else the string-table entry, else the internal name."""
     default = record['item_name']['default']
     if default and default != str(record['item_name']['index']):
         return default
+    if names:
+        name = names.get(record['item_name']['index'])
+        if name:
+            return name
     return record['string_key']
 
 
@@ -63,7 +80,7 @@ def read_table(game_dir: str) -> list[dict]:
     return records
 
 
-def merge(records: list[dict], db: dict) -> tuple[list[dict], list[dict]]:
+def merge(records: list[dict], db: dict, names: dict[int, str] | None = None) -> tuple[list[dict], list[dict]]:
     existing = {entry['itemKey']: entry for entry in db.get('items', [])}
     items = list(existing.values())
     added = []
@@ -72,7 +89,7 @@ def merge(records: list[dict], db: dict) -> tuple[list[dict], list[dict]]:
             continue
         entry = {
             'itemKey': record['key'],
-            'name': display_name(record),
+            'name': display_name(record, names),
             'category': 'Misc',
             'internalName': record['string_key'],
             'maxStack': record['max_stack_count'],
@@ -116,14 +133,20 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
     records = read_table(args.game_dir)
+    try:
+        names = string_table.read_table(args.game_dir, STRING_GROUP, ITEM_STRINGS)
+    except ValueError as exc:
+        print(f"string table: {exc}", file=sys.stderr)
+        names = {}
     if os.path.exists(args.db):
         with open(args.db, encoding='utf-8') as fh:
             db = json.load(fh)
     else:
         db = {'items': [], 'version': 4}
 
-    items, added = merge(records, db)
+    items, added = merge(records, db, names)
     print(f"game rows: {len(records)} | db entries: {len(db.get('items', []))} | added: {len(added)}")
+    print(f"string table: {len(names)} readable entries (the rest is dictionary-coded)")
 
     for entry in added[:args.show]:
         print(f"  {entry['itemKey']:>8}  {entry['name']:<34} maxStack={entry['maxStack']}")
