@@ -21,6 +21,7 @@ Run:
 
 from __future__ import annotations
 
+import json
 import os
 import struct
 import sys
@@ -208,6 +209,50 @@ class DisplayNameTest(unittest.TestCase):
         record = {"item_name": {"category": 7, "index": 123, "default": "123"},
                   "string_key": "Small_Fire_Bomb"}
         self.assertEqual(refresh_item_db.display_name(record), "Small_Fire_Bomb")
+
+
+class DerivationTest(unittest.TestCase):
+
+    def test_bag_key_uses_equip_type_and_defaults_to_the_general_bag(self):
+        self.assertEqual(refresh_item_db.bag_key({"equip_type_info": 1963713749}), 1)
+        self.assertEqual(refresh_item_db.bag_key({"equip_type_info": 0}), 2)
+
+    def test_added_entries_get_category_and_stack_from_the_record(self):
+        record = {"key": 1004051, "string_key": "Quest_Paper_Military_Notice",
+                  "max_stack_count": 1, "equip_type_info": 0,
+                  "item_name": {"index": 1004051, "default": "1004051"}}
+        items, added = refresh_item_db.merge([record], {"items": []})
+        self.assertEqual(added[0]["category"], "Quest")
+        self.assertEqual(added[0]["maxStack"], 1)
+
+    def test_merge_keeps_names_and_categories_the_user_already_has(self):
+        record = {"key": 1, "string_key": "Money_Copper", "max_stack_count": 100000,
+                  "equip_type_info": 0, "item_name": {"index": 1, "default": "1"}}
+        db = {"items": [{"itemKey": 1, "name": "Renamed Copper", "category": "Currency",
+                         "internalName": "Money_Copper", "maxStack": 100000}]}
+        items, added = refresh_item_db.merge([record], db)
+        self.assertEqual(added, [])
+        self.assertEqual(items[0]["name"], "Renamed Copper")
+        self.assertEqual(items[0]["category"], "Currency")
+
+
+@unittest.skipUnless(have_game(), f"no game install at {GAME_DIR}")
+class BagMapRuleTest(unittest.TestCase):
+    """The save side picks the inventory bag from `item_category_map.json`; the rule
+    in `refresh_item_db.bag_key` must agree with the curated map, otherwise new
+    items land in the wrong bag."""
+
+    def test_rule_reproduces_the_curated_map_on_the_current_install(self):
+        map_path = os.path.join(_PYTHON_ROOT, "data", "item_category_map.json")
+        if not os.path.isfile(map_path):
+            self.skipTest(f"no curated map at {map_path}")
+        with open(map_path, encoding="utf-8") as fh:
+            curated = json.load(fh)
+        records = {int(record["key"]): record for record in refresh_item_db.read_table(GAME_DIR)}
+        checked = [(int(key), value) for key, value in curated.items() if int(key) in records]
+        self.assertGreater(len(checked), 0, "the map and the install share no item keys")
+        disagreed = [key for key, value in checked if int(value) != refresh_item_db.bag_key(records[key])]
+        self.assertEqual(disagreed[:10], [], f"bag rule disagrees on {len(disagreed)} of {len(checked)} items")
 
 
 if __name__ == "__main__":

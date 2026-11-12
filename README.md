@@ -40,18 +40,23 @@ Verified on an x86-64 Fedora system (Python 3.15, PySide6 6.8, PyInstaller 6.22)
 | Check | Result |
 |---|---|
 | Dependencies install | `pip install PySide6 lz4 cryptography pyinstaller` — `lz4` compiles from source when no wheel exists, so `python3-devel` and a C compiler are required. |
-| Both GUIs start and render | Yes (checked under Xvfb); tabs build, item DB loads (6236 items Save Editor / 6341 Game Mods). |
+| Both GUIs start and render | Yes (checked under Xvfb); tabs build, item DB loads (7080 items Save Editor JSON / 7159 Game Mods DB rows after the refresh below). |
 | Save + game path discovery | A Proton prefix is found through the UI: `Auto-Detect Client` resolves the install folder, the sidebar lists the save slot under `compatdata/3321460/pfx`. |
 | Native C++ backend | CMake builds `libparc_parser.so`; the ctypes wrapper loads it and reports `crimson_save_backend 2.1.0`. |
 | Native Rust module | `dmm_parser` loads via the extension loader; `extract_file`, `parse_papgt_file` are present. |
 | Save pipeline | Encrypt → compress → write, read back: byte-identical round-trip; a flipped byte in the payload is refused by HMAC verification. |
 | Packaged binaries | `build.py` produces Linux ELF executables for both tools and they run without import errors. |
+| Item table on a 2.04 install | The native extension cannot read it (`trie offset 1634142208 out of bounds`); the pure-Python readers in `dmm_parser.pack_index` / `dmm_parser.item_record` read all 7069 rows. `sync_from_local_game` in both apps now falls back to those readers when the native path fails, so a current install can be scanned. |
+| String table (`item.paloc`) | Only 6 entries are plain literals; the rest of the stream is prefix-coded against a dictionary the game builds at pack time, so most display names stay internal (on current data `item_name.default` is the decimal paloc id, not localized text). |
+| Bag-key rule | `1` for equip rows, `2` otherwise. It reproduces all 5886 curated `item_category_map.json` entries on this install, so it can fill the 1199 game items the map lacked. Game Mods reads bag keys from the DB table (no JSON fallback), so `--write-map --sqlite` mirrors the derived keys there too. |
+| Item DB refresh | `python3 -m dmm_parser.tools.refresh_item_db <install> --write --write-map --sqlite`: +844 Save Editor entries, +1063 Game Mods entries, +1199 bag keys in both apps and the Game Mods DB table. |
+| Real save parse | A genuine `save.save` decrypts, HMAC-verifies and scans: 8,050,617-byte blob, 968 item entries, 771 distinct keys. 86 of those keys were missing from the item DB before the refresh; 77 now resolve, and the Game Mods bag lookup returns the derived key for a new item (`1004403` → bag 1). |
+| Tests | `python3 -m dmm_parser.tools._test_readers` — 21 tests pass against the install; the game-data ones skip when no install is available (`CD_GAME_DIR` or the default Steam path). |
 | `crimson_rs` | The repository package is pure Python and works; `crimson_rs` from PyPI is not installable on Linux and is not needed. |
 
-**Not verified — needs your own game data.** No Linux machine here has a Crimson Desert install or a
-real `save.save`, so parsing a genuine save, PAZ patching and cross-checking against the game were not
-exercised. The round-trip above proves internal consistency, not compatibility with the game. If a real
-save breaks something, that is the first place to test this fork.
+**Still not verified:** writing a patched save or a PAZ overlay back and observing the result in the
+running game. Reading real game data and real saves is now covered (rows above); in-game behaviour is not,
+so the round-trip proof still shows internal consistency, not compatibility with the game.
 
 ## Downloads (fork builds)
 

@@ -24,6 +24,31 @@ for _install_dir in platform_paths.game_install_candidates():
         SEARCH_PATHS.append(_candidate)
 
 
+def _pure_python_tool():
+    """The 2.04-capable pure-Python readers, or None when they are not importable.
+
+    The packaged native extension resolves pack-index names through the pre-2.04
+    trie, so on a current install this package is the only path that can read the
+    item table. In a source checkout it sits beside the editor under
+    `CrimsonGameMods/dmm_parser`; a packaged build sees it only when the spec
+    bundles the package, so callers must treat `None` as "native path only".
+    """
+    try:
+        from dmm_parser.tools import refresh_item_db
+        return refresh_item_db
+    except ImportError:
+        # Append, not insert: `models` and `platform_paths` are already resolved
+        # from the editor directory and must not be shadowed by the app sibling.
+        sibling = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "CrimsonGameMods")
+        if sibling not in _sys.path and os.path.isdir(sibling):
+            _sys.path.append(sibling)
+        try:
+            from dmm_parser.tools import refresh_item_db
+            return refresh_item_db
+        except ImportError:
+            return None
+
+
 class ItemNameDB:
 
     def __init__(self) -> None:
@@ -161,7 +186,10 @@ class ItemNameDB:
                 "iteminfo.staticinfobody",
             )
         except Exception as exc:
-            return False, f"Could not read local item data: {exc}"
+            tool = _pure_python_tool()
+            if tool is None:
+                return False, f"Could not read local item data: {exc}"
+            return self._sync_with_pure_python(game_path, tool, native_error=str(exc))
 
         if len(header) < 2:
             return False, "Local item-data header is invalid."
@@ -234,6 +262,60 @@ class ItemNameDB:
         return True, (
             f"Local game scan complete: {len(extracted_keys)} current client items; "
             f"{len(self.items)} total known ({added} added, {updated} refreshed)." + suffix
+        )
+
+    def _sync_with_pure_python(self, game_path: str, tool, native_error: str) -> tuple[bool, str]:
+        """Refresh through the pure-Python 2.04 readers when the native path fails."""
+        try:
+            records = tool.read_table(game_path)
+            names = tool.read_names(game_path)
+        except Exception as exc:
+            return False, f"Pure-Python item reader failed: {exc}"
+
+        existing = [
+            {"itemKey": key, "name": info.name, "category": info.category,
+             "internalName": info.internal_name, "maxStack": info.max_stack}
+            for key, info in self.items.items()
+        ]
+        entries, added = tool.merge(records, {"items": existing}, names)
+        if not entries:
+            return False, "No usable item records were found in the local game data."
+
+        self.items = {
+            entry["itemKey"]: ItemInfo(
+                item_key=entry["itemKey"],
+                name=entry["name"],
+                internal_name=entry["internalName"],
+                category=entry["category"],
+                max_stack=entry["maxStack"],
+            )
+            for entry in entries
+        }
+        self.version += 1
+        # Same rule as the native path: a bundled resource is read from _MEIPASS,
+        # so persist the refreshed database beside the executable.
+        self.loaded_path = os.path.join(_exe_dir, "item_names.json")
+        self.save()
+        report = {
+            "generatedUtc": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+            "source": "installed_client_pure_python",
+            "gamePath": os.path.abspath(game_path),
+            "nativeError": native_error,
+            "parsedRecords": len(records),
+            "databaseItems": len(self.items),
+            "added": len(added),
+            "namesFromStringTable": sum(1 for e in added if names.get((e["itemKey"] << 32) | 0x70)),
+        }
+        report_path = os.path.join(os.path.dirname(self.loaded_path), "item_scan_report.json")
+        try:
+            with open(report_path, "w", encoding="utf-8") as report_file:
+                json.dump(report, report_file, indent=2, ensure_ascii=False)
+        except OSError:
+            report_path = ""
+        suffix = f" Report: {report_path}" if report_path else ""
+        return True, (
+            "Local game scan complete with the pure-Python readers "
+            f"(native path unavailable): {len(self.items)} known ({len(added)} added)." + suffix
         )
 
 

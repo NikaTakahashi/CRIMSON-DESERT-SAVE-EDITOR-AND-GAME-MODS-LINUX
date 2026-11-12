@@ -4,6 +4,7 @@ import json
 import logging
 import os
 import struct
+import sys
 from typing import Dict, List
 from urllib.request import urlopen, Request
 from urllib.error import URLError
@@ -17,6 +18,29 @@ GITHUB_URL = (
     "https://raw.githubusercontent.com/"
     "NattKh/CrimsonDesertCommunityItemMapping/main/item_names.json"
 )
+
+
+def _pure_python_tool():
+    """The 2.04-capable pure-Python readers, or None when they are not importable.
+
+    The native extension resolves pack-index names through the pre-2.04 trie and
+    reads ItemInfo records in the pre-2.04 order, so on a current install it cannot
+    read the item table at all; `dmm_parser` is the only path that can. Guarded
+    import, because a packaged build only carries the package when it is bundled.
+    """
+    try:
+        from dmm_parser.tools import refresh_item_db
+        return refresh_item_db
+    except ImportError:
+        module_dir = os.path.dirname(os.path.abspath(__file__))
+        for candidate in (module_dir, os.path.dirname(module_dir)):
+            if candidate not in sys.path:
+                sys.path.insert(0, candidate)
+        try:
+            from dmm_parser.tools import refresh_item_db
+            return refresh_item_db
+        except ImportError:
+            return None
 
 
 class ItemNameDB:
@@ -206,14 +230,20 @@ class ItemNameDB:
         try:
             import crimson_rs
         except ImportError:
-            return False, "crimson_rs module not available."
+            tool = _pure_python_tool()
+            if tool is None:
+                return False, "crimson_rs module not available."
+            return self._sync_with_pure_python(game_path, tool, "crimson_rs module not available")
 
         dp = "gamedata/binary__/client/bin"
         try:
             pabgh_data = crimson_rs.extract_file(game_path, "0008", dp, "iteminfo.pabgh")
             pabgb_data = crimson_rs.extract_file(game_path, "0008", dp, "iteminfo.pabgb")
         except Exception as e:
-            return False, f"Failed to extract iteminfo: {e}"
+            tool = _pure_python_tool()
+            if tool is None:
+                return False, f"Failed to extract iteminfo: {e}"
+            return self._sync_with_pure_python(game_path, tool, str(e))
 
         count = struct.unpack_from('<H', pabgh_data, 0)[0]
         header_entries = []
@@ -319,6 +349,50 @@ class ItemNameDB:
             f"New items: {new_count}\n"
             f"Names matched: {matched} (source: {paloc_source})\n"
             f"Unmatched: {len(self.items) - matched}"
+        )
+
+    def _sync_with_pure_python(self, game_path: str, tool, native_error: str) -> tuple[bool, str]:
+        """Refresh through the pure-Python 2.04 readers when the native path fails.
+
+        Unlike the native path this keeps the entries already in the database, so a
+        name the user edited survives the refresh.
+        """
+        try:
+            records = tool.read_table(game_path)
+            names = tool.read_names(game_path)
+        except Exception as exc:
+            return False, f"Pure-Python item reader failed: {exc}"
+
+        existing = [
+            {"itemKey": key, "name": info.name, "category": info.category,
+             "internalName": info.internal_name, "maxStack": info.max_stack}
+            for key, info in self.items.items()
+        ]
+        entries, added = tool.merge(records, {"items": existing}, names)
+        if not entries:
+            return False, "No usable item records were found in the local game data."
+
+        self.items = {
+            entry["itemKey"]: ItemInfo(
+                item_key=entry["itemKey"],
+                name=entry["name"],
+                internal_name=entry["internalName"],
+                category=entry["category"],
+                max_stack=entry["maxStack"],
+            )
+            for entry in entries
+        }
+        self.version += 1
+        self.save()
+
+        from_table = sum(1 for entry in added if names.get((entry["itemKey"] << 32) | 0x70))
+        return True, (
+            f"Synced {len(self.items)} items from game client (pure-Python readers).\n"
+            f"New items: {len(added)}\n"
+            f"Names matched: {from_table} (source: plain-literal string-table entries; "
+            "the rest of that stream is dictionary-coded, so those names stay internal)\n"
+            f"Unmatched: {len(added) - from_table}\n"
+            f"Native path: {native_error}"
         )
 
 
