@@ -9,6 +9,7 @@ to hard-code.
 from __future__ import annotations
 
 import os
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -27,6 +28,24 @@ def is_windows() -> bool:
 
 def is_macos() -> bool:
     return sys.platform == "darwin"
+
+
+def ensure_file_dialog_theme() -> str | None:
+    """Pin Qt to its own file dialog for packaged Linux runs; return the value set.
+
+    Under Plasma Qt uses the KDE platform theme, whose file dialog is a KFileWidget
+    driven by KIO. A packaged build has no KF6/KIO plugins, so KIO cannot resolve the
+    `file` protocol (Qt logs `couldn't create worker: Unknown protocol "file"`) and the
+    dialog opens with nothing listed. With the generic theme there is no native dialog,
+    so QFileDialog falls back to its own widget, which browses without KIO. An explicit
+    QT_QPA_PLATFORMTHEME from the user wins.
+    """
+    if getattr(sys, "frozen", False) and not is_windows() and not is_macos():
+        if os.environ.get("QT_QPA_PLATFORMTHEME"):
+            return None
+        os.environ["QT_QPA_PLATFORMTHEME"] = "generic"
+        return "generic"
+    return None
 
 
 def app_data_dir(app_name: str = APP_NAME) -> Path:
@@ -160,7 +179,13 @@ def is_process_running(image_name: str) -> bool:
 
 
 def _steam_data_dirs() -> list[Path]:
-    """Steam install roots that can hold steamapps/common and compatdata."""
+    """Steam install roots that can hold steamapps/common and compatdata.
+
+    Steam's default location is not the only place a game can live: every library
+    folder Steam records in steamapps/libraryfolders.vdf (a second library on
+    another drive, for example) is added too, otherwise a game installed there is
+    invisible to the save/game path lookup.
+    """
     candidates: list[Path] = []
     seen: set[Path] = set()
 
@@ -178,6 +203,17 @@ def _steam_data_dirs() -> list[Path]:
     add(Path.home() / ".var" / "app" / "com.valvesoftware.Steam" / ".steam" / "steam")
     if is_macos():
         add(Path.home() / "Library" / "Application Support" / "Steam")
+
+    vdfs = [root / "steamapps" / "libraryfolders.vdf" for root in list(candidates)]
+    vdfs.append(Path.home() / ".config" / "Steam" / "libraryfolders.vdf")
+    for vdf in vdfs:
+        try:
+            text = vdf.read_text(errors="ignore")
+        except OSError:
+            continue
+        for match in re.finditer(r'"path"\s+"([^"]+)"', text):
+            add(Path(match.group(1)))
+
     return candidates
 
 

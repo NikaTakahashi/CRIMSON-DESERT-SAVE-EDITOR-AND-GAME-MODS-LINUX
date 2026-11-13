@@ -1,5 +1,6 @@
 import sys
 import os
+import logging
 import platform_paths
 
 
@@ -170,6 +171,12 @@ def main() -> None:
     harvest_i18n = "--harvest-i18n" in sys.argv
     if harvest_i18n:
         sys.argv = [a for a in sys.argv if a != "--harvest-i18n"]
+
+    theme = platform_paths.ensure_file_dialog_theme()
+    if theme:
+        logging.getLogger("startup").info(
+            "Qt platform theme pinned to %s (packaged builds cannot load the KDE/KIO file dialog)", theme
+        )
 
     app = QApplication(sys.argv)
     from updater import APP_VERSION

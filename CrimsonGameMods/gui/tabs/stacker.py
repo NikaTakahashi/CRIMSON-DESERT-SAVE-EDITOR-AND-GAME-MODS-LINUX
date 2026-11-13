@@ -4258,7 +4258,6 @@ class StackerTab(QWidget):
         dialog = QFileDialog(self, "Export Field JSON", default_name,
                              "Field JSON (*.field.json *.json);;All Files (*)")
         dialog.setAcceptMode(QFileDialog.AcceptSave)
-        dialog.setOption(QFileDialog.DontUseNativeDialog, False)
         dialog.raise_()
         dialog.activateWindow()
         if dialog.exec() != QFileDialog.Accepted:
@@ -4657,7 +4656,6 @@ class StackerTab(QWidget):
         dialog = QFileDialog(self, "Export Field JSON", default_name,
                              "Field JSON (*.field.json *.json);;All Files (*)")
         dialog.setAcceptMode(QFileDialog.AcceptSave)
-        dialog.setOption(QFileDialog.DontUseNativeDialog, False)
         dialog.raise_()
         dialog.activateWindow()
         if dialog.exec() != QFileDialog.Accepted:

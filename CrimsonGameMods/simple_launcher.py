@@ -1286,6 +1286,9 @@ class SimpleWindow(QWidget):
 
 def main():
     logging.basicConfig(level=logging.INFO)
+    theme = platform_paths.ensure_file_dialog_theme()
+    if theme:
+        log.info("Qt platform theme pinned to %s (packaged builds cannot load the KDE/KIO file dialog)", theme)
     app = QApplication(sys.argv)
     app.setStyle("Fusion")
     w = SimpleWindow()

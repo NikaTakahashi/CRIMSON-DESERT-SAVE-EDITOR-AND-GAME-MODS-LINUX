@@ -123,6 +123,10 @@ def main() -> int:
     log.info("Working directory: %s", os.getcwd())
     log.info("Started UTC: %s", datetime.datetime.now(datetime.timezone.utc).isoformat())
 
+    theme = platform_paths.ensure_file_dialog_theme()
+    if theme:
+        log.info("Qt platform theme pinned to %s (packaged builds cannot load the KDE/KIO file dialog)", theme)
+
     QApplication.setHighDpiScaleFactorRoundingPolicy(
         Qt.HighDpiScaleFactorRoundingPolicy.PassThrough
     )
