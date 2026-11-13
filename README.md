@@ -42,6 +42,8 @@ Verified on an x86-64 Fedora system (Python 3.15, PySide6 6.8, PyInstaller 6.22)
 | Dependencies install | `pip install PySide6 lz4 cryptography pyinstaller` — `lz4` compiles from source when no wheel exists, so `python3-devel` and a C compiler are required. |
 | Both GUIs start and render | Yes (checked under Xvfb); tabs build, item DB loads (7080 items Save Editor JSON / 7159 Game Mods DB rows after the refresh below). |
 | Save + game path discovery | A Proton prefix is found through the UI: `Auto-Detect Client` resolves the install folder, the sidebar lists the save slot under `compatdata/3321460/pfx`. |
+| Extra Steam libraries | `libraryfolders.vdf` adds the second library (`/media/Games/SteamLibrary`), so the save root resolves to `.../compatdata/3321460/pfx/drive_c/users/steamuser/AppData/Local/Pearl Abyss/CD/save` instead of nothing. |
+| Packaged dialog pin | Running the reassembled AppImages offscreen writes `Qt platform theme pinned to generic` and creates the data folder beside the `.AppImage`; `--appimage-extract` returns the newly built binary byte-for-byte. |
 | Native C++ backend | CMake builds `libparc_parser.so`; the ctypes wrapper loads it and reports `crimson_save_backend 2.1.0`. |
 | Native Rust module | `dmm_parser` loads via the extension loader; `extract_file`, `parse_papgt_file` are present. |
 | Save pipeline | Encrypt → compress → write, read back: byte-identical round-trip; a flipped byte in the payload is refused by HMAC verification. |
