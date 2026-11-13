@@ -108,6 +108,9 @@ $XDG_DATA_HOME/Steam/steamapps/compatdata/3321460/pfx/drive_c/users/steamuser/Ap
 ~/.local/share/Steam/steamapps/common/Crimson Desert
 ```
 
+Every library folder Steam records in `steamapps/libraryfolders.vdf` is searched as well, so a game
+installed on a second drive is found; a manually set save root in Settings always wins.
+
 ## Caveats worth knowing
 
 - **The in-app updater is not fork-aware.** `updater.py` reads the upstream manifests, which point at

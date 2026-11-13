@@ -46,8 +46,13 @@ python3 build.py --project saveeditor
 
 Crimson Desert has no Linux build, so game and save paths resolve through the Steam
 prefix (`$XDG_DATA_HOME/Steam`, `~/.local/share/Steam`, the flatpak Steam data dir) and,
-for a Proton install, through `steamapps/compatdata/3321460/pfx/drive_c/...`. That is the
-only place the tools look on Linux; there is no drive-letter logic.
+for a Proton install, through `steamapps/compatdata/3321460/pfx/drive_c/...`. Every library
+folder recorded in `steamapps/libraryfolders.vdf` is included, so a game installed on a
+second drive is found. There is no drive-letter logic.
+
+Packaged (AppImage) builds pin Qt's platform theme to `generic`: under Plasma Qt would
+otherwise use the KDE theme's file dialog, which needs the KF6/KIO plugins a packaged build
+cannot load, and the dialog then opens with an empty listing.
 
 `pip install lz4` compiles from source on Python versions without a wheel, which needs a C
 compiler plus the Python dev headers (`python3-dev`). Without `lz4` the Save Editor cannot
