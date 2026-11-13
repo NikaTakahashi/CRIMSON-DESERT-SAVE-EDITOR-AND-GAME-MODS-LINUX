@@ -1,5 +1,5 @@
 {
-  "version": "1.0.9",
-  "url": "https://github.com/NikaTakahashi/CRIMSON-DESERT-SAVE-EDITOR-AND-GAME-MODS-LINUX/releases/download/standalone-v1.0.9/CrimsonSaveEditorStandalone.exe",
-  "notes": "CrimsonSaveEditor v1.0.9 (fork build) - the app now creates its own folder beside the program (the .AppImage file itself when run through the AppImage runtime) and writes config, locale packs, the icon cache and logs there; read-only layouts still fall back to the per-user data dir"
+  "version": "1.0.10",
+  "url": "https://github.com/NikaTakahashi/CRIMSON-DESERT-SAVE-EDITOR-AND-GAME-MODS-LINUX/releases/download/standalone-v1.0.10/CrimsonSaveEditorStandalone.exe",
+  "notes": "CrimsonSaveEditor v1.0.10 (fork build) - game and save path autodetection now searches every Steam library folder recorded in steamapps/libraryfolders.vdf (a second library on another drive was invisible before), and packaged Linux builds pin Qt's platform theme to generic so the file dialog lists folders instead of opening empty under Plasma"
 }

@@ -62,8 +62,8 @@ so the round-trip proof still shows internal consistency, not compatibility with
 
 | Tool | Release | Assets |
 |---|---|---|
-| Save Editor | [standalone-v1.0.9](https://github.com/NikaTakahashi/CRIMSON-DESERT-SAVE-EDITOR-AND-GAME-MODS-LINUX/releases/tag/standalone-v1.0.9) | `.AppImage`, `.tar.gz`, Windows `.exe` |
-| Game Mods | [gamemods-v2.1.9](https://github.com/NikaTakahashi/CRIMSON-DESERT-SAVE-EDITOR-AND-GAME-MODS-LINUX/releases/tag/gamemods-v2.1.9) | `.AppImage`, `.tar.gz`, Windows `.exe` |
+| Save Editor | [standalone-v1.0.10](https://github.com/NikaTakahashi/CRIMSON-DESERT-SAVE-EDITOR-AND-GAME-MODS-LINUX/releases/tag/standalone-v1.0.10) | `.AppImage`, `.tar.gz`, Windows `.exe` |
+| Game Mods | [gamemods-v2.1.10](https://github.com/NikaTakahashi/CRIMSON-DESERT-SAVE-EDITOR-AND-GAME-MODS-LINUX/releases/tag/gamemods-v2.1.10) | `.AppImage`, `.tar.gz`, Windows `.exe` |
 
 - **AppImage** — self-contained, nothing to install: `chmod +x` and run it. It carries its own runtime.
   The squashfs payload is mounted read-only, but the app creates its own folder **beside the `.AppImage`
