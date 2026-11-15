@@ -80,6 +80,12 @@ def _log_thread_exception(args) -> None:
 sys.excepthook = _log_unhandled
 threading.excepthook = _log_thread_exception
 
+# The GUI reads the pack folders from the writable dir; the packs the build ships are
+# inside the read-only bundle, so a packaged run showed an empty `knowledge_packs`.
+# Seed the writable folder from the bundle before anything lists or looks for a pack.
+for _pack_folder in ("knowledge_packs", "quest_packs"):
+    platform_paths.seed_from_bundle(_pack_folder)
+
 
 def _log_shutdown() -> None:
     log.info("Application shutdown")

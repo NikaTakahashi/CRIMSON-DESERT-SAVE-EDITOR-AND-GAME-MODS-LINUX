@@ -1,5 +1,5 @@
 {
-  "version": "1.0.11",
-  "url": "https://github.com/NikaTakahashi/CRIMSON-DESERT-SAVE-EDITOR-AND-GAME-MODS-LINUX/releases/download/standalone-v1.0.11/CrimsonSaveEditorStandalone-linux-x86_64.AppImage",
-  "notes": "CrimsonSaveEditor v1.0.11 (fork build) - the item.paloc entry stream is now decoded as an LZ4 block (16712 entries on the current install instead of 6 plain literals) and names resolve from each install root's own table, so DLC items keep their real names; item_db, armor_catalog and the GUI now share one normalizer, and the bundled item data was rebuilt (2223 identifier-only names down to 67 genuine single-word names)"
+  "version": "1.0.12",
+  "url": "https://github.com/NikaTakahashi/CRIMSON-DESERT-SAVE-EDITOR-AND-GAME-MODS-LINUX/releases/download/standalone-v1.0.12/CrimsonSaveEditorStandalone-linux-x86_64.AppImage",
+  "notes": "CrimsonSaveEditor v1.0.12 (fork build) - the pack folders are now seeded from the bundled defaults on startup, so a packaged run no longer opens empty knowledge_packs and quest_packs (the shipped packs were inside the read-only bundle and were never surfaced); a pack the user already has is never overwritten"
 }

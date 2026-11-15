@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import os
 import re
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -114,6 +115,43 @@ def writable_dir(subdir: str = "", app_name: str = APP_NAME) -> Path:
         except OSError:
             pass
         return fallback
+
+
+def bundle_dir(subdir: str = "") -> Path:
+    """The folder the packaged resources were bundled into.
+
+    A packaged run reads them from the PyInstaller archive contents
+    (`sys._MEIPASS`); a source checkout has no archive, so the package folder
+    itself is the bundle.
+    """
+    base = Path(getattr(sys, "_MEIPASS", "") or "") or Path(os.path.dirname(os.path.abspath(__file__)))
+    return base / subdir if subdir else base
+
+
+def seed_from_bundle(subdir: str) -> Path:
+    """Create the writable pack folder and fill it with the bundled defaults.
+
+    The pack browser reads the writable folder, so a packaged build showed an empty
+    `knowledge_packs` even though the AppImage carries the shipped packs: the bundle
+    is read-only and was never surfaced. Copy each bundled file in when the writable
+    copy is missing -- a pack the user already has is never overwritten, matching the
+    `data_db.open_writable` rule for the working database copy.
+    """
+    target = writable_dir(subdir)
+    source = bundle_dir(subdir)
+    if not source.is_dir():
+        return target
+    for path in sorted(source.iterdir()):
+        if not path.is_file():
+            continue
+        dest = target / path.name
+        if dest.exists():
+            continue
+        try:
+            shutil.copy2(path, dest)
+        except OSError:
+            pass
+    return target
 
 
 def open_path(path: str | os.PathLike[str]) -> None:

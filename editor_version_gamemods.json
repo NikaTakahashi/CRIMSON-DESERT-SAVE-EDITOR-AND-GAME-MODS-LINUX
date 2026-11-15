@@ -1,5 +1,5 @@
 {
-  "version": "2.1.11",
-  "url": "https://github.com/NikaTakahashi/CRIMSON-DESERT-SAVE-EDITOR-AND-GAME-MODS-LINUX/releases/download/gamemods-v2.1.11/CrimsonGameMods-linux-x86_64.AppImage",
-  "notes": "Crimson Game Mods v2.1.11 (fork build) - the item.paloc entry stream is now decoded as an LZ4 block (16712 entries on the current install instead of 6 plain literals) and names resolve from each install root's own table, so DLC items keep their real names; the bundled item data was rebuilt and 2373 stored names that were still raw internal identifiers now hold the decoded display name"
+  "version": "2.1.12",
+  "url": "https://github.com/NikaTakahashi/CRIMSON-DESERT-SAVE-EDITOR-AND-GAME-MODS-LINUX/releases/download/gamemods-v2.1.12/CrimsonGameMods-linux-x86_64.AppImage",
+  "notes": "Crimson Game Mods v2.1.12 (fork build) - the pack folders are now seeded from the bundled defaults on startup, so a packaged run no longer opens empty knowledge_packs and quest_packs (the shipped packs were inside the read-only bundle and were never surfaced); a pack the user already has is never overwritten"
 }

@@ -1,5 +1,19 @@
 # Changelog
 
+## Save Editor (Linux fork) v1.0.12 — pack folders seeded from the bundle
+
+Applies to both apps (`CrimsonSaveEditor`, `CrimsonGameMods`).
+
+- The GUI reads the pack folders from the writable data dir, but the packs the build
+  ships live in the read-only bundle, so a packaged run created empty
+  `knowledge_packs/` and `quest_packs/` and the Abyss gate lookup failed with
+  "Abyss gate pack not found".
+- `platform_paths.seed_from_bundle(subdir)` copies each bundled pack into the writable
+  folder when that copy is missing, and never overwrites a pack the user already has;
+  both entry points call it before anything lists or looks for a pack.
+- `platform_paths.bundle_dir(subdir)` resolves the bundle: `sys._MEIPASS` for a
+  packaged run, the package folder for a source checkout.
+
 ## Save Editor (Linux fork) v1.0.11 — decoded item names
 
 Fork build; the save format itself is unchanged.
