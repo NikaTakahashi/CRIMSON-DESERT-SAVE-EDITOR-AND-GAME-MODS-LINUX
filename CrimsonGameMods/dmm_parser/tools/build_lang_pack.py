@@ -142,7 +142,7 @@ def new_pack(code: str, game_names: Dict[int, str]) -> Dict[str, object]:
 def main(argv: List[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description='Refresh language name packs from the game install.')
     parser.add_argument('game_dir', help='Crimson Desert install directory')
-    parser.add_argument('--out', default=DEFAULT_OUT, help='pack directory (default: the repo language/)')
+    parser.add_argument('--out', default=DEFAULT_OUT, help='pack directory (default: the repo locale/)')
     parser.add_argument('--lang', action='append', help='only this pack code; repeatable')
     parser.add_argument('--write', action='store_true', help='write the packs (default: report only)')
     args = parser.parse_args(argv)
