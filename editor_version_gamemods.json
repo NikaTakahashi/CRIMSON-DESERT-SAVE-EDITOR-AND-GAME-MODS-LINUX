@@ -1,5 +1,5 @@
 {
-  "version": "2.1.10",
-  "url": "https://github.com/NikaTakahashi/CRIMSON-DESERT-SAVE-EDITOR-AND-GAME-MODS-LINUX/releases/download/gamemods-v2.1.10/CrimsonGameMods.exe",
-  "notes": "Crimson Game Mods v2.1.10 (fork build) - game and save path autodetection now searches every Steam library folder recorded in steamapps/libraryfolders.vdf (a second library on another drive was invisible before), and packaged Linux builds pin Qt's platform theme to generic so the file dialog lists folders instead of opening empty under Plasma"
+  "version": "2.1.11",
+  "url": "https://github.com/NikaTakahashi/CRIMSON-DESERT-SAVE-EDITOR-AND-GAME-MODS-LINUX/releases/download/gamemods-v2.1.11/CrimsonGameMods-linux-x86_64.AppImage",
+  "notes": "Crimson Game Mods v2.1.11 (fork build) - the item.paloc entry stream is now decoded as an LZ4 block (16712 entries on the current install instead of 6 plain literals) and names resolve from each install root's own table, so DLC items keep their real names; the bundled item data was rebuilt and 2373 stored names that were still raw internal identifiers now hold the decoded display name"
 }

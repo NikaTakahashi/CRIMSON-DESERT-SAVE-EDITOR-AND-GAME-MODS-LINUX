@@ -1,5 +1,28 @@
 # Changelog
 
+## Save Editor (Linux fork) v1.0.11 — decoded item names
+
+Fork build; the save format itself is unchanged.
+
+- `dmm_parser.string_table` now decodes the `item.paloc` entry stream as an LZ4
+  block (magic `paloc\0`, stream size at offset 9, expanded size at 13) instead of
+  reading only the 6 plain literals; values stored as dictionary codes are still
+  skipped. On this install that yields 16,712 entries instead of 6.
+- `read_names(game_dir)` merges the string table of every install root — the base
+  game plus `dlc/*` — because each pack carries its own table; Game Mods, `item_db`
+  and `armor_catalog` now share one normalizer (`clean_display_name`) and use the
+  string table in native-fallback mode.
+- Bundled data rebuilt from the install. Entries that stored the raw internal
+  identifier now carry the decoded name: Game Mods went from 2,442 identifier names
+  to 67, the Save Editor JSON from 2,223 to 67. The 67 that remain are genuine
+  single-word names (`Lantern`, `Honey`, `Bread`). The Save Editor JSON now holds
+  8,393 entries, the Game Mods DB 8,471 items. Item `1006663` is a DLC row whose
+  name only `dlc_01`'s table carries — reading the base table alone left it as
+  `1006663`.
+- `python3 -m dmm_parser.tools._test_readers`: 26 tests pass against the install,
+  covering the LZ4 decode, the fallback on an undecodable stream and the per-root
+  table check.
+
 ## Save Editor (Linux fork) v1.0.8 — 2.04 item data
 
 Fork build release; the save format itself is unchanged.
@@ -18,24 +41,6 @@ Fork build release; the save format itself is unchanged.
   items it lacked (7085 entries total).
 - On the supplied save: 86 item keys were unknown before the refresh, 77 resolve
   now; the remaining 9 are not item-table rows.
-
-### String table decoding
-
-- `dmm_parser.string_table` now decodes the `item.paloc` entry stream as an LZ4
-  block (magic `paloc\0`, stream size at offset 9, expanded size at 13) instead of
-  reading only the 6 plain literals; values that are dictionary codes are still
-  skipped. On this install that yields 16,712 entries instead of 6.
-- `read_names(game_dir)` merges the string table of every install root — the base
-  game plus `dlc/*` — because each pack has its own table; Game Mods, `item_db` and
-  `armor_catalog` now share one normalizer (`clean_display_name`) and use the string
-  table in native-fallback mode.
-- Bundled data rebuilt from the install. Entries that stored the raw internal
-  identifier now carry the decoded name: Game Mods went from 2,442 identifier names
-  to 67 (2,373 corrected, tool-reported), the Save Editor JSON from 2,223 to 67. The
-  67 that remain are genuine single-word names (`Lantern`, `Honey`, `Bread`). The
-  Save Editor JSON now holds 8,393 entries, the Game Mods DB 8,471 items. Item
-  `1006663` is a DLC row whose name only `dlc_01`'s table carries — reading the base
-  table alone left it as `1006663`.
 
 ### Packaging
 

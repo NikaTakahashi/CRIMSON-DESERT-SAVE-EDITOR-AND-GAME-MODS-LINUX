@@ -1,5 +1,5 @@
 {
-  "version": "1.0.10",
-  "url": "https://github.com/NikaTakahashi/CRIMSON-DESERT-SAVE-EDITOR-AND-GAME-MODS-LINUX/releases/download/standalone-v1.0.10/CrimsonSaveEditorStandalone.exe",
-  "notes": "CrimsonSaveEditor v1.0.10 (fork build) - game and save path autodetection now searches every Steam library folder recorded in steamapps/libraryfolders.vdf (a second library on another drive was invisible before), and packaged Linux builds pin Qt's platform theme to generic so the file dialog lists folders instead of opening empty under Plasma"
+  "version": "1.0.11",
+  "url": "https://github.com/NikaTakahashi/CRIMSON-DESERT-SAVE-EDITOR-AND-GAME-MODS-LINUX/releases/download/standalone-v1.0.11/CrimsonSaveEditorStandalone-linux-x86_64.AppImage",
+  "notes": "CrimsonSaveEditor v1.0.11 (fork build) - the item.paloc entry stream is now decoded as an LZ4 block (16712 entries on the current install instead of 6 plain literals) and names resolve from each install root's own table, so DLC items keep their real names; item_db, armor_catalog and the GUI now share one normalizer, and the bundled item data was rebuilt (2223 identifier-only names down to 67 genuine single-word names)"
 }
