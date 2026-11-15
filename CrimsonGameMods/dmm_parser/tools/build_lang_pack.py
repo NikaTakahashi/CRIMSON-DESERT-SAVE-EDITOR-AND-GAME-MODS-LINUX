@@ -11,11 +11,16 @@
 dmm-parser-build-lang-pack — regenerate the editor's language name packs from the
 game install.
 
-The shipped packs in `language/` were built before the DLC item tables were read,
-so every supported pack is short: 5948 item entries against the 8307 item names the
-install holds for each of its 14 language tables. This reads every install root's
-own `item*.paloc` for each language directory and refreshes the `items` section of
-each supported pack, which is what the GUI resolves a display name from.
+The shipped packs were built before the DLC item tables were read, so every
+supported pack is short: 5948 item entries against the 8307 item names the install
+holds for each of its 14 language tables. This reads every install root's own
+`item*.paloc` for each language directory and refreshes the `items` section of each
+supported pack, which is what the GUI resolves a display name from.
+
+Packs are written to `locale/`, the folder `gui_i18n._load_names` searches, the
+PyInstaller bundle copies and the raw download URL serves. `language/` is the
+authoring folder from `TranslationReadMe.txt` and is not read at runtime, so it has
+to be regenerated from the same run to stay in step.
 
 Only `items` is touched. `quests`, `missions` and `knowledge` keep whatever the
 pack already had, and an entry the pack already has is never overwritten - the packs
@@ -73,7 +78,7 @@ CODE_TO_LANG_DIR = {code: lang_dir for lang_dir, code in LANG_DIR_TO_CODE.items(
 
 ITEM_NAME_PART = 0x70
 
-DEFAULT_OUT = os.path.join(_REPO_ROOT, 'language')
+DEFAULT_OUT = os.path.join(_REPO_ROOT, 'locale')
 
 
 def item_names_by_language(game_dir: str) -> Dict[str, Dict[int, str]]:
