@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 import struct
 import sys
 from typing import Dict, List
@@ -329,7 +330,7 @@ class ItemNameDB:
             if display_name:
                 matched += 1
             else:
-                display_name = internal_name.replace('_', ' ')
+                display_name = clean_display_name(internal_name)
             self.items[item_key] = ItemInfo(
                 item_key=item_key,
                 name=display_name,
@@ -368,7 +369,7 @@ class ItemNameDB:
              "internalName": info.internal_name, "maxStack": info.max_stack}
             for key, info in self.items.items()
         ]
-        entries, added = tool.merge(records, {"items": existing}, names)
+        entries, added, renamed = tool.merge(records, {"items": existing}, names)
         if not entries:
             return False, "No usable item records were found in the local game data."
 
@@ -385,15 +386,28 @@ class ItemNameDB:
         self.version += 1
         self.save()
 
-        from_table = sum(1 for entry in added if names.get((entry["itemKey"] << 32) | 0x70))
+        from_table = sum(1 for entry in entries if names.get((entry["itemKey"] << 32) | 0x70))
         return True, (
             f"Synced {len(self.items)} items from game client (pure-Python readers).\n"
             f"New items: {len(added)}\n"
-            f"Names matched: {from_table} (source: plain-literal string-table entries; "
-            "the rest of that stream is dictionary-coded, so those names stay internal)\n"
-            f"Unmatched: {len(added) - from_table}\n"
+            f"Names from the decoded string table: {from_table} "
+            "(every install root, each with its own table)\n"
+            f"Names corrected on existing entries: {len(renamed)}\n"
             f"Native path: {native_error}"
         )
+
+
+def clean_display_name(internal_name: str) -> str:
+    """Display name built from an internal identifier the string table lacks.
+
+    Single definition for both apps' name fallbacks: the GUI, the armor catalog and
+    `dmm_parser.tools.refresh_item_db` all show the same text for the same key.
+    """
+    s = re.sub(r'([a-z])([A-Z])', r'\1 \2', internal_name)
+    s = s.replace('_', ' ')
+    s = re.sub(r'\s+', ' ', s).strip()
+    s = re.sub(r'\bArmor\s+Armor\b', 'Armor', s)
+    return s
 
 
 def _guess_item_category(internal_name: str) -> str:

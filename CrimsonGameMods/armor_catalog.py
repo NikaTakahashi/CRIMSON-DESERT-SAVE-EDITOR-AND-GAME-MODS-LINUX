@@ -5,6 +5,8 @@ import struct
 from dataclasses import dataclass, field
 from typing import Optional
 
+from item_db import clean_display_name
+
 ITEMINFO_MARKER = b"\x00\x01\x00\x00\x00\x00\x00\x00\x00\x07\x70\x00\x00\x00"
 
 CATEGORY_KEYWORDS = [
@@ -149,12 +151,7 @@ def get_category(internal_name: str) -> Optional[str]:
     return None
 
 
-def clean_display_name(internal_name: str) -> str:
-    s = re.sub(r'([a-z])([A-Z])', r'\1 \2', internal_name)
-    s = s.replace('_', ' ')
-    s = re.sub(r'\s+', ' ', s).strip()
-    s = re.sub(r'\bArmor\s+Armor\b', 'Armor', s)
-    return s
+
 
 
 def parse_transmog_items_crimson_rs(data: bytes) -> list[ArmorItem]:

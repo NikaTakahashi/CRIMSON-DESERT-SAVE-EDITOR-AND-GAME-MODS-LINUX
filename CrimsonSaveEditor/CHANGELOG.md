@@ -19,6 +19,24 @@ Fork build release; the save format itself is unchanged.
 - On the supplied save: 86 item keys were unknown before the refresh, 77 resolve
   now; the remaining 9 are not item-table rows.
 
+### String table decoding
+
+- `dmm_parser.string_table` now decodes the `item.paloc` entry stream as an LZ4
+  block (magic `paloc\0`, stream size at offset 9, expanded size at 13) instead of
+  reading only the 6 plain literals; values that are dictionary codes are still
+  skipped. On this install that yields 16,712 entries instead of 6.
+- `read_names(game_dir)` merges the string table of every install root — the base
+  game plus `dlc/*` — because each pack has its own table; Game Mods, `item_db` and
+  `armor_catalog` now share one normalizer (`clean_display_name`) and use the string
+  table in native-fallback mode.
+- Bundled data rebuilt from the install. Entries that stored the raw internal
+  identifier now carry the decoded name: Game Mods went from 2,442 identifier names
+  to 67 (2,373 corrected, tool-reported), the Save Editor JSON from 2,223 to 67. The
+  67 that remain are genuine single-word names (`Lantern`, `Honey`, `Bread`). The
+  Save Editor JSON now holds 8,393 entries, the Game Mods DB 8,471 items. Item
+  `1006663` is a DLC row whose name only `dlc_01`'s table carries — reading the base
+  table alone left it as `1006663`.
+
 ### Packaging
 
 - Both editor specs add the sibling `dmm_parser` package to the search path and to
@@ -28,8 +46,9 @@ Fork build release; the save format itself is unchanged.
 
 ### Known limits
 
-- Most display names stay internal: `item.paloc` exposes 6 plain-literal entries,
-  the rest is prefix-coded against a dictionary the game builds at pack time.
+- Values that `item.paloc` stores as dictionary codes are still not decoded; the
+  plain-literal entries are, which is what resolved the names above. A name the game
+  only ever stored as a dictionary code still falls back to the identifier.
 - New items have names, categories and bag keys but no template or stack-limit
   entries, so the custom-item creator still needs a donor template for them.
 

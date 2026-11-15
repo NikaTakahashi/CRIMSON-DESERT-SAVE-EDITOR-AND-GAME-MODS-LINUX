@@ -9,19 +9,19 @@ mapping, so items added after the mapping was captured are covered.
 The item table is read with the 2.04 readers in `dmm_parser.pack_index` /
 `dmm_parser.item_record` (the packaged native extension cannot read current
 game data). Existing entries keep their display name and category; entries the
-game has but the DB does not are added with the display name when the string
-table can supply one, otherwise with the internal name.
+game has but the DB does not are added, and an entry whose stored name is still
+the internal identifier is corrected - that name was a fallback, not a rename the
+user made.
 
 Display names live in the `.paloc` string tables. The ChaCha20 layer is handled
-in pure Python (`dmm_parser.pack_crypto`), and `dmm_parser.string_table` reads
-the entries stored as plain literals - 6 on `item.paloc`, cross-checked against
-an independent dump of that table. The rest of the entry stream is prefix-coded
-against a string dictionary the game builds at pack time and does not ship in
-the table, so the native `parse_paloc_bytes` fails ("not enough data") on current
-data and most names stay internal. On current game data every record's
-`item_name.default` is the decimal paloc id `(key << 32) | 0x70`, not localized
-text, so a name only appears when the record itself carries text or the string
-table has the entry.
+in pure Python (`dmm_parser.pack_crypto`), and `dmm_parser.string_table` decodes
+the LZ4 block that holds the entry stream, which gives the whole table: 14082
+records on `item.paloc`, 2686 on `item.dlc_01.paloc`. Each install root has its
+own table, and the base table has no entry for a DLC item, so `read_names` reads
+every root. On current game data every record's `item_name.default` is the decimal
+paloc id `(key << 32) | 0x70`, not localized text, so a name comes from the table
+or from `item_db.clean_display_name` applied to the internal identifier; 72 of the
+7068 base records have no entry at all, and those keep the normalized identifier.
 
 Entries the game has but the DB does not also get the two values the save side
 needs: a category from the GUI's own classifier (`item_db._guess_item_category`)
@@ -52,9 +52,9 @@ _PYTHON_ROOT = os.path.normpath(os.path.join(os.path.dirname(os.path.dirname(os.
 if _PYTHON_ROOT not in sys.path:
     sys.path.insert(0, _PYTHON_ROOT)
 
-# One classifier for both the tool and the GUI: the tool must not invent a second
-# set of category rules that the app would then disagree with.
-from item_db import _guess_item_category
+# One classifier and one name normalizer for both the tool and the GUI: the tool
+# must not invent a second set of rules that the app would then disagree with.
+from item_db import _guess_item_category, clean_display_name
 
 ITEM_GROUP = '0008'
 ITEM_DIR = 'gamedata/binarystaticinfo__/bin'
@@ -67,7 +67,7 @@ DEFAULT_DB = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.pat
 
 
 def display_name(record: dict, names: dict[int, str] | None = None) -> str:
-    """Localized default, else the string-table entry, else the internal name."""
+    """Localized default, else the string-table entry, else the normalized identifier."""
     default = record['item_name']['default']
     if default and default != str(record['item_name']['index']):
         return default
@@ -75,7 +75,7 @@ def display_name(record: dict, names: dict[int, str] | None = None) -> str:
         name = names.get(record['item_name']['index'])
         if name:
             return name
-    return record['string_key']
+    return clean_display_name(record['string_key'])
 
 
 def install_roots(game_dir: str) -> list[tuple[str, str]]:
@@ -134,39 +134,79 @@ def bag_key(record: dict) -> int:
     return 1 if record.get('equip_type_info') else 2
 
 
+def item_table_file(index: dict) -> str | None:
+    """The item-name string table inside a pack group.
+
+    `item.paloc` for the base game, `item.<dlc_id>.paloc` for a DLC tree;
+    `itemgroup.paloc` is the category table and is not a name table.
+    """
+    for position, entry in enumerate(index['files']):
+        dir_path, file_name = entry_path(index, position, entry)
+        if dir_path == string_table.STRING_DIR and file_name.startswith('item.'):
+            return file_name
+    return None
+
+
 def read_names(game_dir: str, index: dict | None = None) -> dict[int, str]:
-    """Item display names that the string table stores as plain literals."""
-    return string_table.read_table(game_dir, STRING_GROUP, ITEM_STRINGS, index)
+    """Item display names from every install root's own string table.
+
+    Each DLC tree carries its own `item.<dlc_id>.paloc`, and the base table has no
+    entry for a DLC item, so reading only `item.paloc` left every DLC name as the
+    internal identifier.
+    """
+    names: dict[int, str] = {}
+    for root, _label in install_roots(game_dir):
+        root_index = index if index and root == game_dir else read_index(root, STRING_GROUP)
+        table = item_table_file(root_index)
+        if table:
+            names.update(string_table.read_table(root, STRING_GROUP, table, root_index))
+    return names
 
 
-def merge(records: list[dict], db: dict, names: dict[int, str] | None = None) -> tuple[list[dict], list[dict]]:
+def merge(records: list[dict], db: dict, names: dict[int, str] | None = None
+          ) -> tuple[list[dict], list[dict], list[dict]]:
+    """Merge game records into the existing entries: (items, added, renamed).
+
+    An entry whose stored name is the internal identifier is a fallback, not a user
+    rename, so the string table replaces it; a name the user set is left alone.
+    """
     existing = {entry['itemKey']: entry for entry in db.get('items', [])}
     items = list(existing.values())
     added = []
+    renamed = []
     for record in records:
-        if record['key'] in existing:
-            continue
-        internal = record['string_key']
-        entry = {
-            'itemKey': record['key'],
-            'name': display_name(record, names),
-            'category': _guess_item_category(internal),
-            'internalName': internal,
-            'maxStack': record['max_stack_count'],
-        }
-        items.append(entry)
-        added.append(entry)
+        entry = existing.get(record['key'])
+        if entry is None:
+            internal = record['string_key']
+            entry = {
+                'itemKey': record['key'],
+                'name': display_name(record, names),
+                'category': _guess_item_category(internal),
+                'internalName': internal,
+                'maxStack': record['max_stack_count'],
+            }
+            items.append(entry)
+            added.append(entry)
+        elif not entry['name'] or entry['name'] == entry['internalName']:
+            resolved = display_name(record, names)
+            if resolved != entry['name']:
+                entry['name'] = resolved
+                renamed.append(entry)
     items.sort(key=lambda e: e['itemKey'])
-    return items, added
+    return items, added, renamed
 
 
-def sync_sqlite(added: list[dict]) -> int:
-    """Add the new entries through the GUI's own ItemNameDB path (its SQLite file)."""
+def sync_sqlite(entries: list[dict]) -> int:
+    """Write the merged entries through the GUI's own ItemNameDB path (its SQLite file).
+
+    Takes every entry, not only the added ones, so a name the merge corrected is
+    written as well.
+    """
     from item_db import ItemNameDB
     from models import ItemInfo
 
     store = ItemNameDB()
-    for entry in added:
+    for entry in entries:
         store.items[entry['itemKey']] = ItemInfo(
             item_key=entry['itemKey'],
             name=entry['name'],
@@ -219,7 +259,7 @@ def main(argv: list[str] | None = None) -> int:
 
     records = read_table(args.game_dir)
     try:
-        names = string_table.read_table(args.game_dir, STRING_GROUP, ITEM_STRINGS)
+        names = read_names(args.game_dir)
     except ValueError as exc:
         print(f"string table: {exc}", file=sys.stderr)
         names = {}
@@ -229,15 +269,16 @@ def main(argv: list[str] | None = None) -> int:
     else:
         db = {'items': [], 'version': 4}
 
-    items, added = merge(records, db, names)
+    items, added, renamed = merge(records, db, names)
     sources: dict[str, int] = {}
     for record in records:
         sources[record['source']] = sources.get(record['source'], 0) + 1
     print(f"item tables: " + ", ".join(f"{label}={n}" for label, n in sorted(sources.items())))
-    print(f"game rows: {len(records)} | db entries: {len(db.get('items', []))} | added: {len(added)}")
-    print(f"string table: {len(names)} readable entries (the rest is dictionary-coded)")
-    from_table = sum(1 for e in added if names.get((e['itemKey'] << 32) | 0x70))
-    print(f"added names: {from_table} from the string table, {len(added) - from_table} internal")
+    print(f"game rows: {len(records)} | db entries: {len(db.get('items', []))} | added: {len(added)} "
+          f"| names corrected: {len(renamed)}")
+    print(f"string table: {len(names)} entries decoded from every install root")
+    from_table = sum(1 for e in items if names.get((e['itemKey'] << 32) | 0x70))
+    print(f"names: {from_table} from the string table, {len(items) - from_table} normalized identifier")
     categories: dict[str, int] = {}
     for entry in added:
         categories[entry['category']] = categories.get(entry['category'], 0) + 1
@@ -269,7 +310,7 @@ def main(argv: list[str] | None = None) -> int:
             json.dump(doc, fh, ensure_ascii=False, indent=2)
         print(f"wrote {len(items)} entries to {out}")
         if args.sqlite:
-            total = sync_sqlite(added)
+            total = sync_sqlite(items)
             print(f"sqlite now holds {total} items")
         if args.write_map and missing:
             for record in missing:

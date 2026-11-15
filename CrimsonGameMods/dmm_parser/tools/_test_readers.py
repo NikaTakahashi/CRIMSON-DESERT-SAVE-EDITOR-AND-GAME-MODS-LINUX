@@ -22,6 +22,7 @@ Run:
 from __future__ import annotations
 
 import json
+import lz4.block
 import os
 import struct
 import sys
@@ -102,9 +103,10 @@ class ItemRecordTest(unittest.TestCase):
             self.assertEqual(record["item_desc"]["index"], (key << 32) | 0x71,
                              f"desc paloc id mismatch for {key}")
 
-    def test_display_name_uses_the_string_table_only_where_it_can(self):
-        # Every record's default is the decimal paloc id, so names come from the
-        # string table's plain entries or fall back to the internal name.
+    def test_display_name_uses_the_decoded_string_table(self):
+        # Every record's default is the decimal paloc id, so the name comes from the
+        # decoded entry stream; only a key the table lacks falls back to the
+        # normalized identifier.
         names = string_table.read_table(GAME_DIR, STRING_GROUP, refresh_item_db.ITEM_STRINGS)
         covered = 0
         for key, offset in self.rows:
@@ -116,11 +118,11 @@ class ItemRecordTest(unittest.TestCase):
                 self.assertEqual(refresh_item_db.display_name(record, names), names[loc],
                                  f"string table name ignored for {key}")
             else:
-                self.assertEqual(refresh_item_db.display_name(record, names), record["string_key"],
+                self.assertEqual(refresh_item_db.display_name(record, names),
+                                 refresh_item_db.clean_display_name(record["string_key"]),
                                  f"unexpected localized text for {key}")
-        self.assertGreater(covered, 0, "no plain entry reached the display name")
-        self.assertLess(covered, len(self.rows),
-                        "coverage must stay partial while the dictionary codec is undecoded")
+        self.assertGreater(covered, len(self.rows) * 0.9,
+                           f"the decoded table covered only {covered}/{len(self.rows)} rows")
 
     def test_arrow_row_decodes_to_known_values(self):
         record, consumed = item_record.read_record(self.body, self.rows[0][1])
@@ -167,6 +169,25 @@ class StringTableFormatTest(unittest.TestCase):
         blob[string_table.STREAM_OFFSET:] = entry
         self.assertEqual(list(string_table.iter_plain_entries(bytes(blob))), [])
 
+    def test_entry_stream_decodes_from_the_lz4_block(self):
+        records = b''.join(struct.pack('<I', 7) + struct.pack('<I', 0)
+                           + struct.pack('<I', len(key)) + key
+                           + struct.pack('<I', len(value)) + value
+                           for key, value in [(b'4294967408', b'Copper'),
+                                              (b'9448928051312', b'Stub Arrow')])
+        stream = lz4.block.compress(records)
+        blob = bytearray(b'paloc\x00' + b'\0' * (string_table.STREAM_OFFSET - 6) + stream)
+        blob[9:13] = struct.pack('<I', len(stream))
+        blob[13:17] = struct.pack('<I', len(records))
+        self.assertEqual(list(string_table.iter_entries(bytes(blob))),
+                         [{'key': 4294967408, 'value': 'Copper'},
+                          {'key': 9448928051312, 'value': 'Stub Arrow'}])
+
+    def test_undecodable_stream_falls_back_to_plain_literals(self):
+        blob = _plain_blob([('4294967408', 'Copper')], output_size=999999)
+        self.assertEqual(list(string_table.iter_entries(blob)),
+                         [{'key': 4294967408, 'value': 'Copper'}])
+
 
 @unittest.skipUnless(have_strings(), f"no string table group at {GAME_DIR}/{STRING_GROUP}")
 class StringTableGameTest(unittest.TestCase):
@@ -175,6 +196,16 @@ class StringTableGameTest(unittest.TestCase):
         names = string_table.read_table(GAME_DIR, STRING_GROUP, refresh_item_db.ITEM_STRINGS)
         self.assertEqual(names.get((1 << 32) | 0x70), "Copper")
         self.assertEqual(names.get((2200 << 32) | 0x70), "Stub Arrow")
+
+    def test_names_come_from_each_install_root_its_own_table(self):
+        dlc_root = os.path.join(GAME_DIR, 'dlc')
+        if not os.path.isdir(dlc_root):
+            self.skipTest(f"no DLC tree at {dlc_root}")
+        names = refresh_item_db.read_names(GAME_DIR)
+        self.assertEqual(names.get((1 << 32) | 0x70), "Copper")
+        # Only dlc_01's table carries this item's name; reading just the base table
+        # left it as the internal identifier in the item list.
+        self.assertEqual(names.get((1006663 << 32) | 0x70), "Timberham Sawmill For Lease")
 
     def test_stored_stream_is_smaller_than_the_expanded_size(self):
         index = pack_index.read_index(GAME_DIR, STRING_GROUP)
@@ -192,11 +223,11 @@ class DisplayNameTest(unittest.TestCase):
                   "string_key": "Pyeonjeon_Arrow"}
         self.assertEqual(refresh_item_db.display_name(record, {9448928051312: "Stub Arrow"}), "Stub Arrow")
 
-    def test_missing_string_table_entry_falls_back_to_the_internal_name(self):
+    def test_missing_string_table_entry_falls_back_to_the_normalized_identifier(self):
         record = {"item_name": {"category": 7, "index": 123, "default": "123"},
-                  "string_key": "Small_Fire_Bomb"}
+                  "string_key": "Dev_QA_dlc_Ocean_walk"}
         self.assertEqual(refresh_item_db.display_name(record, {9448928051312: "Stub Arrow"}),
-                         "Small_Fire_Bomb")
+                         "Dev QA dlc Ocean walk")
 
     def test_localized_default_is_used_when_present(self):
         record = {"item_name": {"category": 7, "index": 123, "default": "Stub Arrow"},
@@ -205,10 +236,10 @@ class DisplayNameTest(unittest.TestCase):
         self.assertEqual(refresh_item_db.display_name(record, {123: "From The String Table"}),
                          "Stub Arrow", "the string table must not override record text")
 
-    def test_numeric_default_falls_back_to_internal_name(self):
+    def test_numeric_default_falls_back_to_the_normalized_identifier(self):
         record = {"item_name": {"category": 7, "index": 123, "default": "123"},
                   "string_key": "Small_Fire_Bomb"}
-        self.assertEqual(refresh_item_db.display_name(record), "Small_Fire_Bomb")
+        self.assertEqual(refresh_item_db.display_name(record), "Small Fire Bomb")
 
 
 class DerivationTest(unittest.TestCase):
@@ -221,7 +252,7 @@ class DerivationTest(unittest.TestCase):
         record = {"key": 1004051, "string_key": "Quest_Paper_Military_Notice",
                   "max_stack_count": 1, "equip_type_info": 0,
                   "item_name": {"index": 1004051, "default": "1004051"}}
-        items, added = refresh_item_db.merge([record], {"items": []})
+        items, added, _renamed = refresh_item_db.merge([record], {"items": []})
         self.assertEqual(added[0]["category"], "Quest")
         self.assertEqual(added[0]["maxStack"], 1)
 
@@ -230,10 +261,24 @@ class DerivationTest(unittest.TestCase):
                   "equip_type_info": 0, "item_name": {"index": 1, "default": "1"}}
         db = {"items": [{"itemKey": 1, "name": "Renamed Copper", "category": "Currency",
                          "internalName": "Money_Copper", "maxStack": 100000}]}
-        items, added = refresh_item_db.merge([record], db)
+        items, added, renamed = refresh_item_db.merge([record], db)
         self.assertEqual(added, [])
+        self.assertEqual(renamed, [])
         self.assertEqual(items[0]["name"], "Renamed Copper")
         self.assertEqual(items[0]["category"], "Currency")
+
+    def test_merge_corrects_a_stored_name_that_is_still_the_identifier(self):
+        # A name equal to the internal identifier is a fallback, not a user rename,
+        # so the string table replaces it.
+        record = {"key": 1, "string_key": "Money_Copper", "max_stack_count": 100000,
+                  "equip_type_info": 0, "item_name": {"index": (1 << 32) | 0x70,
+                                                      "default": str((1 << 32) | 0x70)}}
+        db = {"items": [{"itemKey": 1, "name": "Money_Copper", "category": "Currency",
+                         "internalName": "Money_Copper", "maxStack": 100000}]}
+        items, added, renamed = refresh_item_db.merge([record], db, {(1 << 32) | 0x70: "Copper"})
+        self.assertEqual(added, [])
+        self.assertEqual(renamed, [items[0]])
+        self.assertEqual(items[0]["name"], "Copper")
 
 
 @unittest.skipUnless(have_game(), f"no game install at {GAME_DIR}")

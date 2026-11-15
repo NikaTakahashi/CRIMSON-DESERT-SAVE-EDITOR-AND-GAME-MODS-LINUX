@@ -4779,7 +4779,8 @@ class ItemBuffsTab(QWidget):
             try:
                 summaries, _raw = vfx_lab.parse_vfx_catalog(bytes(self._buff_data))
                 try:
-                    from armor_catalog import get_category, clean_display_name
+                    from armor_catalog import get_category
+                    from item_db import clean_display_name
                 except Exception:
                     get_category = lambda n: None
                     clean_display_name = lambda n: n

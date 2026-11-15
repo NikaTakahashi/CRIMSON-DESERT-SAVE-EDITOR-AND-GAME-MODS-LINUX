@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import datetime
 import platform_paths
 from typing import Dict, List, Optional
@@ -221,7 +222,7 @@ class ItemNameDB:
                 parsed += 1
                 extracted_keys.add(record_key)
                 existing = previous.get(record_key)
-                display = existing.name if existing and existing.name else internal.replace("_", " ")
+                display = existing.name if existing and existing.name else clean_display_name(internal)
                 self.items[record_key] = ItemInfo(
                     item_key=record_key,
                     name=display,
@@ -284,7 +285,7 @@ class ItemNameDB:
              "internalName": info.internal_name, "maxStack": info.max_stack}
             for key, info in self.items.items()
         ]
-        entries, added = tool.merge(records, {"items": existing}, names)
+        entries, added, renamed = tool.merge(records, {"items": existing}, names)
         if not entries:
             return False, "No usable item records were found in the local game data."
 
@@ -311,7 +312,8 @@ class ItemNameDB:
             "parsedRecords": len(records),
             "databaseItems": len(self.items),
             "added": len(added),
-            "namesFromStringTable": sum(1 for e in added if names.get((e["itemKey"] << 32) | 0x70)),
+            "namesCorrected": len(renamed),
+            "namesFromStringTable": sum(1 for e in entries if names.get((e["itemKey"] << 32) | 0x70)),
         }
         report_path = os.path.join(os.path.dirname(self.loaded_path), "item_scan_report.json")
         try:
@@ -324,6 +326,20 @@ class ItemNameDB:
             "Local game scan complete with the pure-Python readers "
             f"(native path unavailable): {len(self.items)} known ({len(added)} added)." + suffix
         )
+
+
+def clean_display_name(internal_name: str) -> str:
+    """Display name built from an internal identifier the string table lacks.
+
+    Same rule as `CrimsonGameMods/item_db.clean_display_name`; the item-refresh tool
+    imports it from this module, so the standalone app and the game-mods app show the
+    same fallback text for the same key.
+    """
+    s = re.sub(r'([a-z])([A-Z])', r'\1 \2', internal_name)
+    s = s.replace('_', ' ')
+    s = re.sub(r'\s+', ' ', s).strip()
+    s = re.sub(r'\bArmor\s+Armor\b', 'Armor', s)
+    return s
 
 
 def _guess_item_category(internal_name: str) -> str:
