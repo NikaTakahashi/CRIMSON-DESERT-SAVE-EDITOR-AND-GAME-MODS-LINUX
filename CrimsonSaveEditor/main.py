@@ -80,10 +80,11 @@ def _log_thread_exception(args) -> None:
 sys.excepthook = _log_unhandled
 threading.excepthook = _log_thread_exception
 
-# The GUI reads the pack folders from the writable dir; the packs the build ships are
-# inside the read-only bundle, so a packaged run showed an empty `knowledge_packs`.
-# Seed the writable folder from the bundle before anything lists or looks for a pack.
-for _pack_folder in ("knowledge_packs", "quest_packs"):
+# The GUI reads these folders from the writable dir; the files the build ships are
+# inside the read-only bundle, so a packaged run showed them empty. Seed the writable
+# copy from the bundle before anything lists or looks for a pack or a language.
+for _pack_folder in ("knowledge_packs", "quest_packs", "dropset_packs", "packs", "sets",
+                     "locale", "localization", "localization_eng"):
     platform_paths.seed_from_bundle(_pack_folder)
 
 

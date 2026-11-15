@@ -79,10 +79,12 @@ def _setup_file_logging() -> None:
 
 _setup_file_logging()
 
-# The GUI reads the pack folders from the writable dir; the packs the build ships are
-# inside the read-only bundle, so a packaged run showed an empty `knowledge_packs`.
-# Seed the writable folder from the bundle before anything lists or looks for a pack.
-for _pack_folder in ("knowledge_packs", "quest_packs"):
+# The GUI reads these folders from the writable dir; the files the build ships are
+# inside the read-only bundle, so a packaged run showed them empty and the Abyss gate
+# lookup failed. Seed the writable copy from the bundle before anything lists or looks
+# for a pack or a language.
+for _pack_folder in ("knowledge_packs", "quest_packs", "dropset_packs", "sets",
+                     "locale", "localization", "localization_eng"):
     platform_paths.seed_from_bundle(_pack_folder)
 
 os.environ.setdefault("QT_ENABLE_HIGHDPI_SCALING", "1")

@@ -4,13 +4,15 @@
 
 Applies to both apps (`CrimsonSaveEditor`, `CrimsonGameMods`).
 
-- The GUI reads the pack folders from the writable data dir, but the packs the build
-  ships live in the read-only bundle, so a packaged run created empty
-  `knowledge_packs/` and `quest_packs/` and the Abyss gate lookup failed with
-  "Abyss gate pack not found".
-- `platform_paths.seed_from_bundle(subdir)` copies each bundled pack into the writable
-  folder when that copy is missing, and never overwrites a pack the user already has;
-  both entry points call it before anything lists or looks for a pack.
+- The GUI reads the pack and language folders from the writable data dir, but the files
+  the build ships live in the read-only bundle, so a packaged run created empty
+  `knowledge_packs/`, `quest_packs/`, `dropset_packs/`, `sets/`, `locale/`,
+  `localization/` and `localization_eng/` (and the Abyss gate lookup failed with
+  "Abyss gate pack not found").
+- `platform_paths.seed_from_bundle(subdir)` copies each bundled file into the writable
+  folder when that copy is missing, and never overwrites a pack or language the user
+  already has; both entry points call it at startup before anything lists or looks for
+  a pack or a language.
 - `platform_paths.bundle_dir(subdir)` resolves the bundle: `sys._MEIPASS` for a
   packaged run, the package folder for a source checkout.
 
