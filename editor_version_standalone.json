@@ -1,5 +1,5 @@
 {
-  "version": "1.0.12",
-  "url": "https://github.com/NikaTakahashi/CRIMSON-DESERT-SAVE-EDITOR-AND-GAME-MODS-LINUX/releases/download/standalone-v1.0.12/CrimsonSaveEditorStandalone-linux-x86_64.AppImage",
-  "notes": "CrimsonSaveEditor v1.0.12 (fork build) - the pack folders are now seeded from the bundled defaults on startup, so a packaged run no longer opens empty knowledge_packs and quest_packs (the shipped packs were inside the read-only bundle and were never surfaced); a pack the user already has is never overwritten"
+  "version": "1.0.13",
+  "url": "https://github.com/NikaTakahashi/CRIMSON-DESERT-SAVE-EDITOR-AND-GAME-MODS-LINUX/releases/download/standalone-v1.0.13/CrimsonSaveEditorStandalone-linux-x86_64.AppImage",
+  "notes": "CrimsonSaveEditor v1.0.13 (fork build) - the language name packs now cover every item the install carries (8321 entries per language instead of 5948); packaged builds bundle `locale/` from the repo root, so the bundled packs are the full set instead of the UI-only copy that sat beside the spec"
 }

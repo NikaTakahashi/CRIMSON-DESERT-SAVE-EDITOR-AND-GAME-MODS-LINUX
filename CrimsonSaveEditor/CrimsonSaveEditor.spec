@@ -16,6 +16,10 @@ _NATIVE_BACKENDS = [
 # before pathex, so `item_db`/`models` still resolve to this app's own copies.
 _GAME_MODS = os.path.normpath(os.path.join(_SPEC_DIR, '..', 'CrimsonGameMods'))
 
+# The language packs live in the repo's `locale/`, not beside the spec, so a
+# packaged build has to be pointed at them explicitly.
+_LOCALE = os.path.normpath(os.path.join(_SPEC_DIR, '..', 'locale'))
+
 a = Analysis(
     ['main.py'],
     pathex=[_GAME_MODS],
@@ -44,7 +48,7 @@ a = Analysis(
         ('buff_skill_descriptions.json', '.'),
         ('game_map.json', '.'),
         ('localizationstring_eng_items.tsv', '.'),
-        ('locale', 'locale'),
+        (_LOCALE, 'locale'),
         ('knowledge_packs', 'knowledge_packs'),
     ],
     hiddenimports=[
