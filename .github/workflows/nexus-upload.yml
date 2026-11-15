@@ -59,12 +59,14 @@ jobs:
             echo "::error::Tag '$tag' does not start with standalone- or gamemods-; nothing to upload."
             exit 1
           fi
-          if [ -z "${{ vars.NEXUS_GROUP_STANDALONE }}" ] || [ -z "${{ vars.NEXUS_GROUP_GAMEMODS }}" ]; then
-            echo "::error::Missing repo Variable NEXUS_GROUP_STANDALONE or NEXUS_GROUP_GAMEMODS. Set both under repo Settings -> Secrets and variables -> Actions -> Variables."
-            exit 1
+          if [ -z "$GROUP_STANDALONE" ] || [ -z "$GROUP_GAMEMODS" ]; then
+            echo "Repo Variables NEXUS_GROUP_STANDALONE / NEXUS_GROUP_GAMEMODS are not set, so there is nothing to upload; skipping."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
           fi
 
       - name: Download release exe
+        if: steps.meta.outputs.skip != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -74,6 +76,7 @@ jobs:
           ls -la "$exe"
 
       - name: Zip exe for Nexus upload
+        if: steps.meta.outputs.skip != 'true'
         run: |
           base="${{ steps.meta.outputs.exe }}"
           base="${base%.exe}"
@@ -83,6 +86,7 @@ jobs:
           ls -la "$zip"
 
       - name: Upload to Nexus Mods
+        if: steps.meta.outputs.skip != 'true'
         uses: Nexus-Mods/upload-action@v1.0.0-beta.4
         with:
           api_key: ${{ secrets.NEXUSMODS_API_KEY }}
