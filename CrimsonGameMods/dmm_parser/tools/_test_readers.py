@@ -255,5 +255,39 @@ class BagMapRuleTest(unittest.TestCase):
         self.assertEqual(disagreed[:10], [], f"bag rule disagrees on {len(disagreed)} of {len(checked)} items")
 
 
+@unittest.skipUnless(have_game(), f"no game install at {GAME_DIR}")
+class DlcItemTableTest(unittest.TestCase):
+    """DLC content ships its own item table in group 0008, so the DB refresh must
+    read every table on the install; the base-only read left DLC items out of the
+    item list, which is what the user saw as items not appearing."""
+
+    def test_every_item_table_on_the_install_is_read(self):
+        dlc_root = os.path.join(GAME_DIR, "dlc")
+        if not os.path.isdir(dlc_root):
+            self.skipTest("no dlc tree on this install")
+        sources: dict[str, int] = {}
+        for record in refresh_item_db.read_table(GAME_DIR):
+            sources[record["source"]] = sources.get(record["source"], 0) + 1
+        seen_dlc = 0
+        for name in sorted(os.listdir(dlc_root)):
+            root = os.path.join(dlc_root, name)
+            if not os.path.isdir(root):
+                continue
+            try:
+                index = pack_index.read_index(root, GROUP)
+            except (OSError, ValueError):
+                continue
+            tables = [entry for entry in
+                      (pack_index.entry_path(index, position, e)[1]
+                       for position, e in enumerate(index["files"]))
+                      if entry.startswith("iteminfo") and entry.endswith("staticinfobody")]
+            if not tables:
+                continue
+            seen_dlc += 1
+            self.assertGreater(sources.get(name, 0), 0,
+                               f"{name} has {tables[0]} but read_table returned no records for it")
+        self.assertGreater(seen_dlc, 0, "no DLC item table found to check")
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

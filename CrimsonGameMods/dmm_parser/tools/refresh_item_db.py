@@ -46,7 +46,7 @@ import sys
 
 from .. import string_table
 from ..item_record import check_boundaries, read_header, read_record
-from ..pack_index import extract, read_index
+from ..pack_index import entry_path, extract, read_index
 
 _PYTHON_ROOT = os.path.normpath(os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), ".."))
 if _PYTHON_ROOT not in sys.path:
@@ -78,17 +78,50 @@ def display_name(record: dict, names: dict[int, str] | None = None) -> str:
     return record['string_key']
 
 
+def install_roots(game_dir: str) -> list[tuple[str, str]]:
+    """The install plus every DLC tree, each of which carries its own item table."""
+    roots = [(game_dir, 'base game')]
+    dlc_root = os.path.join(game_dir, 'dlc')
+    if os.path.isdir(dlc_root):
+        for name in sorted(os.listdir(dlc_root)):
+            path = os.path.join(dlc_root, name)
+            if os.path.isdir(path):
+                roots.append((path, name))
+    return roots
+
+
 def read_table(game_dir: str) -> list[dict]:
-    index = read_index(game_dir, ITEM_GROUP)
-    body = extract(game_dir, ITEM_GROUP, ITEM_DIR, BODY, index)
-    header = extract(game_dir, ITEM_GROUP, ITEM_DIR, HEADER, index)
-    rows = read_header(header)
-    bad = check_boundaries(header, body)
-    if bad:
-        raise ValueError(f"{len(bad)} records do not end on the next row start: {bad[:5]}")
-    records = []
-    for key, offset in rows:
-        records.append(read_record(body, offset)[0])
+    """Every item record on the install: the base table plus each DLC table.
+
+    Group 0008 holds `iteminfo.staticinfobody` for the base game and
+    `iteminfo.<dlc_id>.staticinfobody` for each DLC. Reading only the base file
+    left the DLC items out of the editor's item list, so a save holding one of
+    them showed `Unknown (key)` with no bag key.
+    """
+    records: list[dict] = []
+    for root, label in install_roots(game_dir):
+        index = read_index(root, ITEM_GROUP)
+        entries = {entry_path(index, position, entry): entry
+                   for position, entry in enumerate(index['files'])}
+        for dir_path, file_name in sorted(entries):
+            if dir_path != ITEM_DIR or not file_name.startswith('iteminfo'):
+                continue
+            if not file_name.endswith('staticinfobody'):
+                continue
+            header_name = f"{file_name[:-len('body')]}header"
+            if (dir_path, header_name) not in entries:
+                continue
+            body = extract(root, ITEM_GROUP, dir_path, file_name, index)
+            header = extract(root, ITEM_GROUP, dir_path, header_name, index)
+            rows = read_header(header)
+            bad = check_boundaries(header, body)
+            if bad:
+                raise ValueError(
+                    f"{len(bad)} records do not end on the next row start: {bad[:5]}")
+            for key, offset in rows:
+                record = read_record(body, offset)[0]
+                record['source'] = label
+                records.append(record)
     return records
 
 
@@ -197,6 +230,10 @@ def main(argv: list[str] | None = None) -> int:
         db = {'items': [], 'version': 4}
 
     items, added = merge(records, db, names)
+    sources: dict[str, int] = {}
+    for record in records:
+        sources[record['source']] = sources.get(record['source'], 0) + 1
+    print(f"item tables: " + ", ".join(f"{label}={n}" for label, n in sorted(sources.items())))
     print(f"game rows: {len(records)} | db entries: {len(db.get('items', []))} | added: {len(added)}")
     print(f"string table: {len(names)} readable entries (the rest is dictionary-coded)")
     from_table = sum(1 for e in added if names.get((e['itemKey'] << 32) | 0x70))
