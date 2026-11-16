@@ -248,6 +248,15 @@ class DerivationTest(unittest.TestCase):
         self.assertEqual(refresh_item_db.bag_key({"equip_type_info": 1963713749}), 1)
         self.assertEqual(refresh_item_db.bag_key({"equip_type_info": 0}), 2)
 
+    def test_enchant_limit_is_the_highest_level_the_blacksmith_can_craft(self):
+        records = [
+            {"key": 1, "equip_type_info": 1, "enchant_data_list": [{"level": 0}, {"level": 10}]},
+            {"key": 2, "equip_type_info": 1, "enchant_data_list": [{"level": 5}]},
+            {"key": 3, "equip_type_info": 0, "enchant_data_list": [{"level": 10}]},
+            {"key": 4, "equip_type_info": 1, "enchant_data_list": []},
+        ]
+        self.assertEqual(refresh_item_db.enchant_limits(records), {1: 10, 2: 5})
+
     def test_added_entries_get_category_and_stack_from_the_record(self):
         record = {"key": 1004051, "string_key": "Quest_Paper_Military_Notice",
                   "max_stack_count": 1, "equip_type_info": 0,

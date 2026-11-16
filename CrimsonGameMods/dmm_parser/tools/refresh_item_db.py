@@ -134,6 +134,24 @@ def bag_key(record: dict) -> int:
     return 1 if record.get('equip_type_info') else 2
 
 
+def enchant_limits(records: list[dict]) -> dict[int, int]:
+    """The highest enchant level each equipment item can reach on this install.
+
+    `enchant_data_list` holds one entry per level the blacksmith can craft for the
+    item, so the highest level present is the game's own limit. The curated map
+    predates the DLC tables: every DLC weapon was absent from it, so the GUI showed
+    a bare `+N` with no limit, and items the curated map had as 0 that the game
+    data takes to +10 could not be raised.
+    """
+    limits: dict[int, int] = {}
+    for record in records:
+        edl = record.get('enchant_data_list') or []
+        if not record.get('equip_type_info') or not edl:
+            continue
+        limits[record['key']] = max(entry.get('level', 0) for entry in edl)
+    return limits
+
+
 def item_table_file(index: dict) -> str | None:
     """The item-name string table inside a pack group.
 
@@ -241,6 +259,24 @@ def sync_map_sqlite(mapping: dict[int, int]) -> int:
     return len(present) + len(rows)
 
 
+def sync_enchant_sqlite(limits: dict[int, int]) -> int:
+    """Mirror the derived enchant limits into the table the game-mods GUI reads.
+
+    `main_window` builds `_max_enchant_map` from `item_enchant_limits` with no JSON
+    fallback, so a derived limit only reaches that app through the table.
+    """
+    from data_db import open_writable, reset_connection
+
+    conn = open_writable()
+    conn.executemany("INSERT OR REPLACE INTO item_enchant_limits VALUES (?, ?)",
+                     sorted(limits.items()))
+    total = conn.execute("SELECT COUNT(*) FROM item_enchant_limits").fetchone()[0]
+    conn.commit()
+    conn.close()
+    reset_connection()
+    return total
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description='Rebuild item_names.json from the game install.')
     parser.add_argument('game_dir', help='Crimson Desert install directory')
@@ -250,6 +286,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument('--sqlite', action='store_true', help='also add the new entries to the GUI SQLite DB')
     parser.add_argument('--map', help='item_category_map.json to fill in (default: next to --db)')
     parser.add_argument('--write-map', action='store_true', help='add bag keys for game items the map is missing')
+    parser.add_argument('--enchant-map', help='max_enchant_map.json to fill in (default: next to --db)')
+    parser.add_argument('--write-enchant', action='store_true',
+                        help='write the enchant limits derived from the game data, replacing the curated map')
     parser.add_argument('--show', type=int, default=15, help='how many added items to print')
     args = parser.parse_args(argv)
 
@@ -300,6 +339,19 @@ def main(argv: list[str] | None = None) -> int:
         missing = [r for r in records if str(r['key']) not in mapping]
         print(f"bag map: {map_path} not found; {len(missing)} items would need a bag key")
 
+    limits = enchant_limits(records)
+    enchant_path = args.enchant_map or os.path.join(
+        os.path.dirname(os.path.abspath(args.db)), 'max_enchant_map.json')
+    curated = {}
+    if os.path.isfile(enchant_path):
+        with open(enchant_path, encoding='utf-8') as fh:
+            curated = json.load(fh)
+    limit_missing = [k for k in limits if str(k) not in curated]
+    limit_disagreed = [(k, v, curated[str(k)]) for k, v in limits.items()
+                       if str(k) in curated and curated[str(k)] != v]
+    print(f"enchant limits: {len(limits)} equipment items; {len(curated)} curated entries, "
+          f"{len(limit_missing)} game items missing, {len(limit_disagreed)} curated values below the game limit")
+
     for entry in added[:args.show]:
         print(f"  {entry['itemKey']:>8}  {entry['name']:<34} maxStack={entry['maxStack']}")
 
@@ -323,8 +375,15 @@ def main(argv: list[str] | None = None) -> int:
             # a JSON-only write leaves the derived keys invisible to that app.
             total = sync_map_sqlite({int(k): int(v) for k, v in mapping.items()})
             print(f"sqlite bag map now holds {total} rows")
-    else:
-        print("report only; pass --write (and --sqlite, --write-map) to update the files")
+    if args.write_enchant:
+        ordered = sorted(limits.items(), key=lambda item: int(item[0]))
+        with open(enchant_path, 'w', encoding='utf-8') as fh:
+            json.dump({str(key): value for key, value in ordered}, fh)
+        print(f"wrote {len(limits)} enchant limits to {enchant_path}")
+        if args.sqlite:
+            print(f"sqlite enchant table now holds {sync_enchant_sqlite(limits)} rows")
+    elif not args.write:
+        print("report only; pass --write (and --sqlite, --write-map, --write-enchant) to update the files")
     return 0
 
 
