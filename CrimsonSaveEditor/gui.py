@@ -1765,6 +1765,7 @@ class QuestEditorWindow(QDialog):
             # rebuilt them afterward. Build each data view only once.
             self._populate_inventory()
             self._populate_equipment()
+            self._populate_resources()
             self._populate_socket_items()
             # Vendor parsing is one of the slowest secondary scans. Defer it
             # unless Repurchase is the tab the user is currently viewing.
@@ -3241,6 +3242,7 @@ class MainWindow(QMainWindow):
         self._build_swap_tab()
         self._build_repurchase_tab()
         self._build_equipment_tab()
+        self._build_resources_tab()
         self._build_sockets_tab()
         self._build_mercenary_tab()
         self._build_dye_tab()
@@ -4767,6 +4769,171 @@ QCheckBox::indicator {{
         layout.addWidget(warn_label)
 
         self._tabs.addTab(tab, tr("tab.equipment"))
+
+    def _build_resources_tab(self) -> None:
+        tab = QWidget()
+        self._resources_tab = tab
+        layout = QVBoxLayout(tab)
+        layout.setContentsMargins(8, 8, 8, 8)
+        layout.setSpacing(6)
+        layout.addWidget(self._make_scope_label("save"))
+
+        res_info = QLabel(
+            "Camp resources and money: one save entry per bag holds the whole total, "
+            "so changing the quantity changes the amount the camp shows in-game."
+        )
+        res_info.setWordWrap(True)
+        res_info.setStyleSheet(
+            f"color: {COLORS['text_dim']}; padding: 4px; font-size: 11px; "
+            f"border: 1px solid {COLORS['border']}; border-radius: 4px;"
+        )
+        layout.addWidget(res_info)
+
+        top = QHBoxLayout()
+        top.addWidget(QLabel("Search:"))
+        self._res_search = QLineEdit()
+        self._res_search.setPlaceholderText("Filter by name, internal name, key, or bag...")
+        self._res_search.textChanged.connect(self._populate_resources)
+        top.addWidget(self._res_search, 1)
+        top.addWidget(self._make_help_btn("resources"))
+        layout.addLayout(top)
+
+        self._res_table = QTableWidget()
+        self._res_table.setColumnCount(6)
+        self._res_table.setHorizontalHeaderLabels([
+            "", "Name", "ItemKey", "Bag", "ItemNo", "Quantity"
+        ])
+        self._res_table.setSelectionBehavior(QAbstractItemView.SelectRows)
+        self._res_table.setSelectionMode(QAbstractItemView.ExtendedSelection)
+        self._res_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Interactive)
+        self._res_table.setColumnWidth(0, 0)
+        self._res_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Interactive)
+        self._res_table.setColumnWidth(1, 200)
+        self._res_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        self._res_table.setSortingEnabled(True)
+        self._res_table.verticalHeader().setDefaultSectionSize(24)
+        self._res_table.setIconSize(QSize(ICON_SIZE, ICON_SIZE))
+        layout.addWidget(self._res_table, 1)
+
+        edit_group = QGroupBox("Edit Selected Resources")
+        edit_layout = QGridLayout(edit_group)
+
+        edit_layout.addWidget(QLabel("Quantity:"), 0, 0)
+        self._res_quantity = QSpinBox()
+        self._res_quantity.setRange(0, 999999999)
+        self._res_quantity.setValue(1)
+        edit_layout.addWidget(self._res_quantity, 0, 1)
+        quantity_btn = QPushButton("Set Quantity")
+        quantity_btn.setObjectName("accentBtn")
+        quantity_btn.clicked.connect(self._set_resource_quantity)
+        edit_layout.addWidget(quantity_btn, 0, 2)
+        res_warn = QLabel(
+            "Rows without a resolved stack field (vendor lists) cannot be edited"
+        )
+        res_warn.setStyleSheet(f"color: {COLORS['warning']}; font-size: 10px;")
+        edit_layout.addWidget(res_warn, 0, 3)
+
+        layout.addWidget(edit_group)
+
+        self._tabs.addTab(tab, tr("tab.resources"))
+
+    def _resource_items(self) -> List[SaveItem]:
+        """Camp resources and money: the stack field is the total, not a slot count.
+
+        Gold Bar is `Misc` in the item database but is stored as camp currency, so it
+        is named here instead of being picked up by category.
+        """
+        return [i for i in self._items if i.category == "Currency" or i.item_key == 53]
+
+    def _populate_resources(self) -> None:
+        table = self._res_table
+        table.setSortingEnabled(False)
+        table.setRowCount(0)
+
+        search = self._res_search.text().lower().strip()
+        filtered = self._resource_items()
+        if search:
+            filtered = [
+                i for i in filtered
+                if search in i.name.lower()
+                or search in str(i.item_key)
+                or search in i.bag.lower()
+                or search in self._name_db.get_internal_name(i.item_key).lower()
+            ]
+
+        table.setRowCount(len(filtered))
+
+        for row, item in enumerate(filtered):
+            color = QColor(CATEGORY_COLORS.get(item.category, COLORS["text"]))
+
+            icon_item = QTableWidgetItem()
+            if self._icons_enabled:
+                px = self._icon_cache.get_pixmap(item.item_key)
+                if px:
+                    icon_item.setIcon(QIcon(px))
+                elif self._icon_cache.has_icon(item.item_key):
+                    self._icon_cache.request_icon(item.item_key, self._on_icon_loaded)
+            table.setItem(row, 0, icon_item)
+
+            name_item = QTableWidgetItem(item.name)
+            name_item.setForeground(QBrush(color))
+            name_item.setData(Qt.UserRole, id(item))
+            table.setItem(row, 1, name_item)
+
+            key_item = _num_item(item.item_key)
+            table.setItem(row, 2, key_item)
+
+            table.setItem(row, 3, QTableWidgetItem(item.bag or "-"))
+
+            no_item = _num_item(item.item_no)
+            no_item.setForeground(QBrush(QColor(COLORS["text_dim"])))
+            table.setItem(row, 4, no_item)
+
+            quantity_item = _num_item(item.stack_count)
+            quantity_item.setForeground(QBrush(color))
+            table.setItem(row, 5, quantity_item)
+
+        table.setSortingEnabled(True)
+
+    def _set_resource_quantity(self) -> None:
+        if not self._save_data:
+            QMessageBox.warning(self, "Set Quantity", "No save loaded.")
+            return
+
+        selected = self._get_selected_items(self._res_table)
+        if not selected:
+            QMessageBox.information(self, "Set Quantity", "Select one or more resources first.")
+            return
+
+        new_quantity = self._res_quantity.value()
+        edits = []
+        skipped = 0
+        for item in selected:
+            if not item.field_offsets.get("_stackCount"):
+                skipped += 1
+                continue
+            old_bytes = apply_stack_edit(self._save_data.decompressed_blob, item, new_quantity)
+            stack_off = item.field_offsets["_stackCount"]
+            edits.append((stack_off, old_bytes, self._save_data.decompressed_blob[stack_off:stack_off + 8]))
+
+        if not edits:
+            QMessageBox.information(
+                self, "Set Quantity",
+                "Nothing to edit: the selected rows have no stack field resolved from the schema."
+            )
+            return
+
+        self._undo_stack.append(UndoEntry(
+            description=f"Set quantity to {new_quantity} for {len(edits)} resources",
+            patches=[(off, old, new) for off, old, new in edits],
+        ))
+        self._dirty = True
+        self._populate_resources()
+        self._populate_inventory()
+        msg = f"Set quantity to {new_quantity} for {len(edits)} resources."
+        if skipped:
+            msg += f" ({skipped} rows skipped, no resolved stack field)"
+        self._update_status(msg)
 
 
     GEM_CATEGORIES = {
@@ -31588,6 +31755,7 @@ QCheckBox::indicator {{
         self._status_parc_label.setStyleSheet(f"color: {COLORS['warning']}; padding: 0 8px;")
         self._populate_inventory()
         self._populate_equipment()
+        self._populate_resources()
         self._populate_socket_items()
 
         from PySide6.QtCore import QTimer
@@ -31618,6 +31786,7 @@ QCheckBox::indicator {{
 
         self._populate_inventory()
         self._populate_equipment()
+        self._populate_resources()
         self._populate_repurchase()
         self._populate_socket_items()
         self._faction_loaded_blob_id = None
@@ -34398,6 +34567,20 @@ QCheckBox::indicator {{
             "4. Now you can swap the copies into different items\n\n"
             "WARNING: Enchant levels above 10 may crash the game.\n"
             "Always back up before making changes."
+        ),
+        "resources": (
+            "Resources (Camp & Money)",
+            "Edit the camp resource totals stored in the save.\n\n"
+            "HOW TO USE:\n"
+            "1. Load a save file from the sidebar\n"
+            "2. Select one or more rows: camp funds, food, timber, stone, weapons, "
+            "money and gold bars\n"
+            "3. Set Quantity and click 'Set Quantity'\n"
+            "4. Save, load in-game\n\n"
+            "NOTE: Each bag holds one entry per resource, so the quantity shown here is "
+            "the total the game displays for that bag. A row whose stack field is not "
+            "resolved from the save's schema (vendor lists) is skipped.\n\n"
+            "UNDO: Every change is recorded on the undo stack."
         ),
         "sockets": (
             "Sockets (Abyss Gear)",
