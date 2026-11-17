@@ -54,7 +54,8 @@ Verified on an x86-64 Fedora system (Python 3.15, PySide6 6.8, PyInstaller 6.22)
 | Bag-key rule | `1` for equip rows, `2` otherwise. It reproduces all 5886 curated `item_category_map.json` entries on this install, so it can fill the game items the map lacked — 8,398 keys once the DLC rows are read. Game Mods reads bag keys from the DB table (no JSON fallback), so `--write-map --sqlite` mirrors the derived keys there too. |
 | Item DB refresh | `python3 -m dmm_parser.tools.refresh_item_db <install> --write --write-map --sqlite`: 8,393 Save Editor names, 8,398 Game Mods names, 8,398 bag keys in both apps, and the Game Mods DB table at 8,471 items. Identifier-only names dropped to 67 in both apps (`Lantern`, `Honey`, `Bread`), from 2,442 in the Game Mods data and 2,223 in the Save Editor JSON. The counts include the 1,555 DLC rows; a base-table-only run misses them. |
 | Enchant limits | `--write-enchant` derives the highest level per equipment item from its `enchant_data_list` (one entry per level the blacksmith can craft): 3,505 items, of which 473 keys the hand-copied `max_enchant_map.json` lacked — all DLC gear, which is why the Equipment tab showed a bare `+N` with no limit — and 173 curated values below the game limit (key 14510 was `0` where the data allows +10). Both JSON maps, the Game Mods `item_enchant_limits` table (3,698 rows, `.db.gz` regenerated) and the Save Editor lookup now agree; the DLC Harpoon Gun (`1005447`) reads `+10/10` on a real save. |
-| Resources tab | New Save Editor tab for the camp/money entries: camp funds, food, timber, stone, weapons, money and gold bars — 26 rows on the real save. It uses the same `apply_stack_edit` path as the Inventory tab (the stack field is the bag total, not a slot count), records every change on the undo stack, and has its own Guides entry. Verified offscreen: setting a quantity writes the field and undo restores it; rows whose stack field is not schema-resolved (vendor lists) are reported as skipped. |
+| Resources tab | New Save Editor tab for the camp resources — item keys 11-15: funds, food, timber, stone, weapons. It uses the same `apply_stack_edit` path as the Inventory tab (the stack field is the bag total, not a slot count), records every change on the undo stack, and has its own Guides entry. The tab label `tab.resources` was missing from every language pack, so each of the
+20 UI files now carries it; `tr()` resolves it per language instead of falling back to English. Verified offscreen: setting a quantity writes the field and undo restores it; rows whose stack field is not schema-resolved (vendor lists) are reported as skipped. |
 | Real save parse | A genuine `save.save` (slot2, `save011220250130111700002`) decrypts, HMAC-verifies and scans: 8,050,617-byte blob, 967 item entries, 770 distinct keys. Before the DLC table was read, 73 of those keys — all DLC items — came back as `Unknown (key)`; after the refresh only two scanner artifacts (`230`, `4353`) fail to resolve. |
 | Tests | `python3 -m dmm_parser.tools._test_readers` — 27 tests pass against the install, including the LZ4 block decode, the fallback when the stream cannot be decoded, one that reads the DLC body from `dlc/dlc_01/0008`, and one that pins the enchant limit to the highest level in `enchant_data_list`; the game-data ones skip when no install is available (`CD_GAME_DIR` or the default Steam path). |
 | `crimson_rs` | The repository package is pure Python and works; `crimson_rs` from PyPI is not installable on Linux and is not needed. |
@@ -67,8 +68,8 @@ so the round-trip proof still shows internal consistency, not compatibility with
 
 | Tool | Release | Assets |
 |---|---|---|
-| Save Editor | [standalone-v1.0.10](https://github.com/NikaTakahashi/CRIMSON-DESERT-SAVE-EDITOR-AND-GAME-MODS-LINUX/releases/tag/standalone-v1.0.10) | `.AppImage`, `.tar.gz`, Windows `.exe` |
-| Game Mods | [gamemods-v2.1.10](https://github.com/NikaTakahashi/CRIMSON-DESERT-SAVE-EDITOR-AND-GAME-MODS-LINUX/releases/tag/gamemods-v2.1.10) | `.AppImage`, `.tar.gz`, Windows `.exe` |
+| Save Editor | [standalone-v1.0.14](https://github.com/NikaTakahashi/CRIMSON-DESERT-SAVE-EDITOR-AND-GAME-MODS-LINUX/releases/tag/standalone-v1.0.14) | `.AppImage`, `.tar.gz`, Windows `.exe` |
+| Game Mods | [gamemods-v2.1.14](https://github.com/NikaTakahashi/CRIMSON-DESERT-SAVE-EDITOR-AND-GAME-MODS-LINUX/releases/tag/gamemods-v2.1.14) | `.AppImage`, `.tar.gz`, Windows `.exe` |
 
 - **AppImage** — self-contained, nothing to install: `chmod +x` and run it. It carries its own runtime.
   The squashfs payload is mounted read-only, but the app creates its own folder **beside the `.AppImage`
@@ -133,7 +134,7 @@ installed on a second drive is found; a manually set save root in Settings alway
 
 | Tool | What it does |
 |---|---|
-| **Save Editor — Standalone** | Edits your local `.save` file: inventory, equipment, camp resources (funds, food, timber, stone, weapons, money, gold bars), sockets (fill/clear up to 5), quests, knowledge, abyss gates, dye. |
+| **Save Editor — Standalone** | Edits your local `.save` file: inventory, equipment, camp resources (funds, food, timber, stone, weapons), sockets (fill/clear up to 5), quests, knowledge, abyss gates, dye. |
 | **Game Mods** | Edits the game's `.pabgb` data via PAZ overlays: ItemBuffs, Stores, DropSets, SpawnEdit, FieldEdit (mount-everywhere, killable NPCs, etc.). |
 
 Neither tool touches the game client in memory. Save Editor writes the encrypted `save.save`; Game Mods

@@ -4779,8 +4779,9 @@ QCheckBox::indicator {{
         layout.addWidget(self._make_scope_label("save"))
 
         res_info = QLabel(
-            "Camp resources and money: one save entry per bag holds the whole total, "
-            "so changing the quantity changes the amount the camp shows in-game."
+            "Camp resources — funds, food, timber, stone, weapons: one save entry per "
+            "bag holds the whole total, so changing the quantity changes the amount the "
+            "camp shows in-game."
         )
         res_info.setWordWrap(True)
         res_info.setStyleSheet(
@@ -4837,13 +4838,12 @@ QCheckBox::indicator {{
 
         self._tabs.addTab(tab, tr("tab.resources"))
 
-    def _resource_items(self) -> List[SaveItem]:
-        """Camp resources and money: the stack field is the total, not a slot count.
+    # Camp Funds, Food, Timber, Stone, Weapons.
+    RESOURCE_KEYS = (11, 12, 13, 14, 15)
 
-        Gold Bar is `Misc` in the item database but is stored as camp currency, so it
-        is named here instead of being picked up by category.
-        """
-        return [i for i in self._items if i.category == "Currency" or i.item_key == 53]
+    def _resource_items(self) -> List[SaveItem]:
+        """Camp resources: the stack field is the total, not a slot count."""
+        return [i for i in self._items if i.item_key in self.RESOURCE_KEYS]
 
     def _populate_resources(self) -> None:
         table = self._res_table
@@ -34569,12 +34569,12 @@ QCheckBox::indicator {{
             "Always back up before making changes."
         ),
         "resources": (
-            "Resources (Camp & Money)",
+            "Resources (Camp)",
             "Edit the camp resource totals stored in the save.\n\n"
             "HOW TO USE:\n"
             "1. Load a save file from the sidebar\n"
-            "2. Select one or more rows: camp funds, food, timber, stone, weapons, "
-            "money and gold bars\n"
+            "2. Select one or more rows: camp funds, food, timber, stone, weapons "
+            "(item keys 11-15)\n"
             "3. Set Quantity and click 'Set Quantity'\n"
             "4. Save, load in-game\n\n"
             "NOTE: Each bag holds one entry per resource, so the quantity shown here is "

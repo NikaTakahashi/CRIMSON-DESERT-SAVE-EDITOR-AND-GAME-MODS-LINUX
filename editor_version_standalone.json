@@ -1,5 +1,5 @@
 {
-  "version": "1.0.13",
-  "url": "https://github.com/NikaTakahashi/CRIMSON-DESERT-SAVE-EDITOR-AND-GAME-MODS-LINUX/releases/download/standalone-v1.0.13/CrimsonSaveEditorStandalone-linux-x86_64.AppImage",
-  "notes": "CrimsonSaveEditor v1.0.13 (fork build) - the language name packs now cover every item the install carries (8321 entries per language instead of 5948); packaged builds bundle `locale/` from the repo root, so the bundled packs are the full set instead of the UI-only copy that sat beside the spec"
+  "version": "1.0.14",
+  "url": "https://github.com/NikaTakahashi/CRIMSON-DESERT-SAVE-EDITOR-AND-GAME-MODS-LINUX/releases/download/standalone-v1.0.14/CrimsonSaveEditorStandalone-linux-x86_64.AppImage",
+  "notes": "CrimsonSaveEditor v1.0.14 (fork build) - the Resources tab now shows only the camp resources (item keys 11-15: funds, food, timber, stone, weapons), and the tab label `tab.resources` is translated in every language pack"
 }

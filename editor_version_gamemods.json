@@ -1,5 +1,5 @@
 {
-  "version": "2.1.13",
-  "url": "https://github.com/NikaTakahashi/CRIMSON-DESERT-SAVE-EDITOR-AND-GAME-MODS-LINUX/releases/download/gamemods-v2.1.13/CrimsonGameMods-linux-x86_64.AppImage",
-  "notes": "Crimson Game Mods v2.1.13 (fork build) - the language name packs now cover every item the install carries (8321 entries per language instead of 5948); packaged builds bundle `locale/` from the repo root, so the bundled packs are the full set instead of the 4 UI files that sat beside the spec"
+  "version": "2.1.14",
+  "url": "https://github.com/NikaTakahashi/CRIMSON-DESERT-SAVE-EDITOR-AND-GAME-MODS-LINUX/releases/download/gamemods-v2.1.14/CrimsonGameMods-linux-x86_64.AppImage",
+  "notes": "Crimson Game Mods v2.1.14 (fork build) - the tab label `tab.resources` is now present in every language pack (the UI key was missing, so non-English builds fell back to English); the language name packs are unchanged otherwise"
 }
