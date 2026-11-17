@@ -7,7 +7,8 @@
 > — created and maintained by **Rice (RicePaddySoftware / NattKh)**.
 >
 > **Thank you, Rice** — every parser, format handler, tab and feature in these tools is their work.
-> This fork changes **only how the tools run on Linux**; the editor itself is unchanged in behaviour.
+> This fork adds two things: **native Linux support**, and **DLC content support** in the game-data
+> readers. Editor behaviour is otherwise upstream's.
 > Fork by [NikaTakahashi](https://github.com/NikaTakahashi). License stays **MPL-2.0** (© RicePaddySoftware).
 
 ## What this fork is for
@@ -32,6 +33,31 @@ guarded, and the POSIX equivalent is used instead.
 | C++ backend | `CMakeLists.txt` builds `libparc_parser.so` with plain CMake (no `cl`), and the `dye_cli` target — which previously only existed as a manual `cl` command — is now a real CMake target; the runtime lookup resolves `dye_cli` outside Windows. |
 | Build specs | Every `.spec` now anchors native-binary and data paths to `SPECPATH` instead of `__file__` (PyInstaller ≥ 6.22 does not define `__file__` in the spec namespace) and picks binaries per platform instead of assuming a Windows `.pyd`. |
 | Windows-only calls | `ctypes.windll`, `CREATE_NO_WINDOW`, `ShellExecuteW` and similar are guarded (`getattr(..., 0)`) so a missing Windows API degrades to the normal path instead of raising. |
+
+## DLC content support
+
+Upstream's readers only look at the base game tables. The content packs ship their **own** blobs, so DLC
+items were unresolvable. This fork reads them, and the work is pure Python — it is not a Linux-only
+behaviour, it applies to the Windows builds too.
+
+| Layer | What is read now |
+|---|---|
+| Item tables | `dmm_parser.pack_index.read_table` walks the base `bin64/contents/0008` **and every `dlc/*` tree**. `dlc/dlc_01/0008/iteminfo.dlc_01.staticinfobody` carries 1,555 rows the base index cannot reach; before this, those items showed as `Unknown (key)`. |
+| Name table | `dmm_parser.item_record.read_names` merges the base `item.paloc` with every DLC `.paloc`. The entry stream is an LZ4 block (magic `paloc\0`, stream size at byte 9, expanded size at 13); the plain-literal entries decode to 16,712 names on this install where the old reader saw 6. Dictionary-coded values are still skipped. |
+| Enchant limits | `--write-enchant` derives the highest craftable level per equipment item from its `enchant_data_list`. 473 keys the hand-copied `max_enchant_map.json` lacked are all DLC gear — that is why the Equipment tab showed a bare `+N` with no limit for them. The DLC Harpoon Gun (`1005447`) reads `+10/10` on a real save. |
+| Bag keys | The rule that reproduces all 5,886 curated `item_category_map.json` entries (`1` for equip rows, `2` otherwise) now fills the items the map lacked: 8,398 keys once the DLC rows are read. Game Mods reads bag keys from its DB table, so `--write-map --sqlite` mirrors the derived keys there as well. |
+
+The shipped data files are regenerated from a local install with
+`python3 -m dmm_parser.tools.refresh_item_db <install> --write --write-map --sqlite`: 8,393 Save Editor
+names, 8,398 Game Mods names, 8,398 bag keys, the Game Mods `item_enchant_limits` table at 3,698 rows and
+its item table at 8,471 items — all including the 1,555 DLC rows. A packaged build therefore resolves DLC
+items without running the refresh yourself; a base-table-only run misses them.
+
+On a real save (slot2, `save011220250130111700002`, 967 item entries / 770 distinct keys), 73 keys were DLC
+items that came back as `Unknown (key)` before this; after the refresh only two scanner artifacts (`230`,
+`4353`) fail to resolve.
+
+DLC data is read from your own installed copy — nothing is redistributed.
 
 ## Status on Linux — what was actually run
 
